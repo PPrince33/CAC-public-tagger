@@ -409,8 +409,11 @@ export async function initTagger() {
         .eq('match_id', matchId);
     
     if (lErr) console.error(lErr);
-    activeLineup = lineup;
+    activeLineup = lineup || [];
     renderPlayerGrids();
+
+    // Load previously synced events from DB
+    await loadSyncedEvents();
 
     // 5. Setup Action Handlers
     // Restore pressure button visual if state persisted
@@ -725,11 +728,20 @@ async function logEventWithNote(kickoffNote) {
     
     // Keep pressure state for next entry (user preference)
 
-    // Reset Action to Pass and Body Part to Right Leg
+    // Reset Action to Pass/Successful/Normal and Body Part to Right Leg
     const actionSelect = document.getElementById('action-select');
-    if (actionSelect.value !== 'Pass') {
-        actionSelect.value = 'Pass';
-        actionSelect.dispatchEvent(new Event('change'));
+    actionSelect.value = 'Pass';
+    actionSelect.dispatchEvent(new Event('change'));
+    // After change event fires and populates outcomes, set Successful
+    const outcomeSelect = document.getElementById('outcome-select');
+    if (outcomeSelect.querySelector('option[value="Successful"]')) {
+        outcomeSelect.value = 'Successful';
+        outcomeSelect.dispatchEvent(new Event('change'));
+    }
+    // After change event fires and populates types, set Normal
+    const typeSelect = document.getElementById('type-select');
+    if (typeSelect.querySelector('option[value="Normal"]')) {
+        typeSelect.value = 'Normal';
     }
     document.getElementById('body-part-select').value = 'Right Leg';
 
@@ -752,38 +764,80 @@ function getFinalDirection() {
     return currentState.homeDirection === 'L2R' ? 'R2L' : 'L2R';
 }
 
+let syncedEvents = []; // Events already saved to DB
+
 function renderStaging() {
     const body = document.getElementById('staging-body');
     if (!body) return;
-    body.innerHTML = localEvents.map((e, idx) => `
-        <tr style="border-bottom: 1px solid var(--border); ${idx % 2 === 0 ? 'background: rgba(0,0,0,0.02);' : ''}">
-            <td style="padding: 6px; white-space: nowrap;">${Math.floor(e.match_time_seconds / 60)}:${(e.match_time_seconds % 60).toString().padStart(2, '0')}</td>
-            <td style="padding: 6px; font-weight: 600;">${e.team_direction}</td>
-            <td style="padding: 6px;"><span style="color:var(--brand);font-weight:600;">${e.action}</span><br><span style="color:var(--text-muted);font-size:0.65rem;">${e.outcome}</span></td>
-            <td style="padding: 6px;">${e.type || '-'}</td>
-            <td style="padding: 6px;">${e.body_part || '-'}</td>
-            <td style="padding: 6px;">${e.pressure_on ? '🔥 Y' : 'N'}</td>
-            <td style="padding: 6px; white-space: nowrap;">
-                ⚡ ${e._ui_player}<br>
-                ${e._ui_reaction_player ? '<span style="color:var(--text-muted);font-size:0.65rem;">🛡 '+e._ui_reaction_player+'</span>' : ''}
-            </td>
-            <td style="padding: 6px; font-family: var(--font-mono); font-size: 0.65rem; white-space: nowrap;">
-                S: ${e.start_x},${e.start_y}<br>
-                E: ${e.end_x !== null ? e.end_x+','+e.end_y : '-'}${e.end_z !== null ? ' (z:'+e.end_z+')' : ''}
-            </td>
-            <td style="padding: 6px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${e.notes || ''}">
-                ${e.notes || '-'}
-            </td>
-            <td style="padding: 6px; text-align: center;">
-                <button onclick="window.removeStagedEvent(${idx})" style="background: none; border: none; cursor: pointer; filter: grayscale(1);">❌</button>
-            </td>
-        </tr>
-    `).reverse().join('');
-    
+
+    const renderRow = (e, idx, isSynced) => {
+        const bgColor = isSynced
+            ? 'background: rgba(40, 167, 69, 0.08); border-left: 3px solid var(--success);'
+            : (idx % 2 === 0 ? 'background: rgba(0,0,0,0.02);' : '');
+        const timeStr = `${Math.floor(e.match_time_seconds / 60)}:${(e.match_time_seconds % 60).toString().padStart(2, '0')}`;
+        const playerDisplay = e._ui_player || 'Unknown';
+        const reactionDisplay = e._ui_reaction_player || '';
+
+        return `
+            <tr style="border-bottom: 1px solid var(--border); ${bgColor}">
+                <td style="padding: 6px; white-space: nowrap;">${timeStr}</td>
+                <td style="padding: 6px; font-weight: 600;">${e.team_direction}</td>
+                <td style="padding: 6px;"><span style="font-weight:600;">${e.action}</span><br><span style="color:var(--text-muted);font-size:0.65rem;">${e.outcome}</span></td>
+                <td style="padding: 6px;">${e.type || '-'}</td>
+                <td style="padding: 6px;">${e.body_part || '-'}</td>
+                <td style="padding: 6px;">${e.pressure_on ? '🔥 Y' : 'N'}</td>
+                <td style="padding: 6px; white-space: nowrap;">
+                    ⚡ ${playerDisplay}<br>
+                    ${reactionDisplay ? '<span style="color:var(--text-muted);font-size:0.65rem;">🛡 '+reactionDisplay+'</span>' : ''}
+                </td>
+                <td style="padding: 6px; font-family: var(--font-mono); font-size: 0.65rem; white-space: nowrap;">
+                    S: ${e.start_x},${e.start_y}<br>
+                    E: ${e.end_x !== null ? e.end_x+','+e.end_y : '-'}${e.end_z !== null ? ' (z:'+e.end_z+')' : ''}
+                </td>
+                <td style="padding: 6px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${e.notes || ''}">
+                    ${e.notes || '-'}
+                </td>
+                <td style="padding: 6px; text-align: center;">
+                    ${isSynced
+                        ? '<span style="color: var(--success); font-size: 0.7rem;">✔</span>'
+                        : `<button onclick="window.removeStagedEvent(${idx})" style="background: none; border: none; cursor: pointer; filter: grayscale(1);">❌</button>`
+                    }
+                </td>
+            </tr>
+        `;
+    };
+
+    // Combine: unsynced on top (newest first), then synced (newest first)
+    const unsyncedRows = localEvents.map((e, idx) => renderRow(e, idx, false)).reverse().join('');
+    const syncedRows = syncedEvents.map((e, idx) => renderRow(e, idx, true)).reverse().join('');
+    body.innerHTML = unsyncedRows + syncedRows;
+
     window.removeStagedEvent = (idx) => {
         localEvents.splice(idx, 1);
         renderStaging();
     };
+}
+
+async function loadSyncedEvents() {
+    if (!activeMatch) return;
+    const { data, error } = await supabase
+        .from('match_events')
+        .select('*, player:players!player_id(player_name), reaction:players!reaction_player_id(player_name)')
+        .eq('match_id', activeMatch.match_id)
+        .order('match_time_seconds', { ascending: true });
+
+    if (error) { console.error('Failed to load synced events:', error); return; }
+
+    syncedEvents = (data || []).map(e => {
+        const pLineup = activeLineup.find(l => l.player_id === e.player_id);
+        const rLineup = activeLineup.find(l => l.player_id === e.reaction_player_id);
+        return {
+            ...e,
+            _ui_player: e.player ? `${e.player.player_name} (${pLineup?.jersey_no || '?'})` : 'Unknown',
+            _ui_reaction_player: e.reaction ? `${e.reaction.player_name} (${rLineup?.jersey_no || '?'})` : null,
+        };
+    });
+    renderStaging();
 }
 
 async function syncEvents() {
@@ -802,6 +856,8 @@ async function syncEvents() {
         btn.innerText = 'Sync Retry';
         btn.disabled = false;
     } else {
+        // Move synced events to the synced list with their UI labels
+        syncedEvents = [...localEvents, ...syncedEvents];
         localEvents = [];
         renderStaging();
         btn.innerText = '☁ Synced';

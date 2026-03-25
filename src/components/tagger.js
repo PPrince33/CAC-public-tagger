@@ -22,6 +22,20 @@ export function TaggerView() {
             <div style="flex-grow: 1; display: grid; grid-template-columns: 1fr 480px; gap: 16px; min-height: 0;">
                 <!-- Left Column: Video & Log -->
                 <div style="display: flex; flex-direction: column; gap: 16px; overflow-y: auto; padding-right: 8px;">
+                    <!-- Video Source Bar -->
+                    <div class="card" style="padding: 12px; flex-shrink: 0;">
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <select id="video-source-select" class="form-input" style="width: 120px; padding: 6px 10px; font-size: 0.75rem;">
+                                <option value="youtube">YouTube</option>
+                                <option value="local">Local File</option>
+                            </select>
+                            <input type="text" id="video-url-input" class="form-input" style="flex: 1; padding: 6px 10px; font-size: 0.75rem;" placeholder="Paste YouTube URL here...">
+                            <button id="load-video-btn" class="btn btn-primary" style="width: auto; padding: 6px 16px; font-size: 0.75rem;">Load</button>
+                            <input type="file" id="local-video-file" style="display: none;" accept="video/*">
+                            <button id="upload-local-btn" class="btn btn-ghost" style="width: auto; padding: 6px 12px; font-size: 0.75rem; display: none;">📂 Browse</button>
+                        </div>
+                    </div>
+
                     <!-- Video Section -->
                     <div id="main-video-card" class="card" style="padding: 0; overflow: hidden; position: relative; flex-shrink: 0;">
                         <div id="video-wrapper" style="aspect-ratio: 16/9; background: #000;">
@@ -32,10 +46,6 @@ export function TaggerView() {
                                 <button id="popout-btn" class="btn btn-ghost" style="width: auto; padding: 6px 12px; font-size: 0.75rem;">🪟 Pop Out</button>
                                 <button id="ptz-btn" class="btn btn-ghost" style="width: auto; padding: 6px 12px; font-size: 0.75rem;">🔍 PTZ: OFF</button>
                                 <button id="reset-ptz-btn" class="btn btn-ghost" style="width: auto; padding: 6px 12px; font-size: 0.75rem;">Reset PTZ</button>
-                            </div>
-                            <div style="display: flex; gap: 4px;">
-                                <input type="file" id="local-video-file" style="display: none;" accept="video/*">
-                                <button id="upload-local-btn" class="btn btn-ghost" style="width: auto; padding: 6px 12px; font-size: 0.75rem; display: none;">📂 Load Local Video</button>
                             </div>
                         </div>
                     </div>
@@ -277,10 +287,46 @@ export async function initTagger() {
     // 2. Initialize Engines
     pitch = new PitchCanvas('pitch-canvas', match.is_futsal);
     goalFace = new GoalFaceCanvas('goal-face-canvas', match.is_futsal);
-    video = new VideoEngine('video-container', match.video_url ? 'youtube' : 'local');
-    
+
+    const videoSourceSelect = document.getElementById('video-source-select');
+    const videoUrlInput = document.getElementById('video-url-input');
+    const loadVideoBtn = document.getElementById('load-video-btn');
+    const uploadLocalBtn = document.getElementById('upload-local-btn');
+
+    // Determine initial source
+    const initialSource = match.video_url ? 'youtube' : 'local';
+    videoSourceSelect.value = initialSource;
+    if (match.video_url) videoUrlInput.value = match.video_url;
+
+    // Toggle URL input vs local file button based on source
+    const updateVideoSourceUI = () => {
+        const src = videoSourceSelect.value;
+        if (src === 'local') {
+            videoUrlInput.style.display = 'none';
+            loadVideoBtn.style.display = 'none';
+            uploadLocalBtn.style.display = 'inline-flex';
+        } else {
+            videoUrlInput.style.display = 'block';
+            loadVideoBtn.style.display = 'inline-flex';
+            uploadLocalBtn.style.display = 'none';
+        }
+    };
+    updateVideoSourceUI();
+    videoSourceSelect.addEventListener('change', updateVideoSourceUI);
+
+    video = new VideoEngine('video-container', initialSource);
     if (match.video_url) video.loadYouTube(match.video_url);
-    else document.getElementById('upload-local-btn').style.display = 'block';
+
+    // Load video from URL input
+    loadVideoBtn.addEventListener('click', async () => {
+        const url = videoUrlInput.value.trim();
+        if (!url) return;
+        // Reinitialize video engine as youtube
+        video = new VideoEngine('video-container', 'youtube');
+        video.loadYouTube(url);
+        // Save URL to match in DB
+        await supabase.from('matches').update({ video_url: url }).eq('match_id', matchId);
+    });
 
     pitch.onCoordsChange = (start, end, e) => {
         document.getElementById('pitch-coords').innerText = `Start: ${start ? start.x+','+start.y : 'None'} | End: ${end ? end.x+','+end.y : 'None'}`;
@@ -367,6 +413,10 @@ export async function initTagger() {
     renderPlayerGrids();
 
     // 5. Setup Action Handlers
+    // Restore pressure button visual if state persisted
+    pressureBtn.innerText = `💥 Pressure: ${currentState.isPressureOn ? 'ON' : 'OFF'}`;
+    pressureBtn.style.background = currentState.isPressureOn ? 'var(--danger)' : 'transparent';
+
     pressureBtn.addEventListener('click', () => {
         currentState.isPressureOn = !currentState.isPressureOn;
         pressureBtn.innerText = `💥 Pressure: ${currentState.isPressureOn ? 'ON' : 'OFF'}`;
@@ -393,12 +443,15 @@ export async function initTagger() {
         window.location.hash = '#matches';
     });
 
-    document.getElementById('upload-local-btn').addEventListener('click', () => {
+    uploadLocalBtn.addEventListener('click', () => {
         document.getElementById('local-video-file').click();
     });
 
     document.getElementById('local-video-file').addEventListener('change', (e) => {
-        if (e.target.files[0]) video.loadLocalFile(e.target.files[0]);
+        if (e.target.files[0]) {
+            video = new VideoEngine('video-container', 'local');
+            video.loadLocalFile(e.target.files[0]);
+        }
     });
 
     document.getElementById('popout-btn').addEventListener('click', () => video.togglePopOut());

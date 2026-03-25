@@ -84,6 +84,7 @@ export function TaggerView() {
                     <div class="card" style="padding: 12px; display: flex; flex-direction: column; align-items: center; flex-shrink: 0;">
                         <canvas id="pitch-canvas" width="480" height="320" style="width: 100%; max-width: 480px; border-radius: var(--radius-sm);"></canvas>
                         <div id="pitch-coords" style="margin-top: 8px; font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-muted);">Start: None | End: None</div>
+                        <div id="pitch-players" style="margin-top: 4px; font-size: 0.75rem; color: var(--text-main); font-weight: 600;"></div>
                     </div>
                     
                     <!-- Goal Face Overlay (Conditional) -->
@@ -596,6 +597,15 @@ function updateLineupState() {
 
     document.getElementById('action-player-lbl').innerText = currentState.actionPlayer ? `${currentState.actionPlayer.name} (#${currentState.actionPlayer.jersey})` : 'None';
     document.getElementById('reaction-player-lbl').innerText = currentState.reactionPlayer ? `${currentState.reactionPlayer.name} (#${currentState.reactionPlayer.jersey})` : 'None';
+
+    // Update pitch player display
+    const pitchPlayers = document.getElementById('pitch-players');
+    if (pitchPlayers) {
+        let txt = '';
+        if (currentState.actionPlayer) txt += `⚡ ${currentState.actionPlayer.name} #${currentState.actionPlayer.jersey}`;
+        if (currentState.reactionPlayer) txt += `  |  🛡 ${currentState.reactionPlayer.name} #${currentState.reactionPlayer.jersey}`;
+        pitchPlayers.innerText = txt || '';
+    }
 }
 
 function handleHotkeys(e) {
@@ -717,11 +727,15 @@ async function logEventWithNote(kickoffNote) {
     localEvents.push(event);
     renderStaging();
     
-    // Auto-advance logic
-    const nextStart = pitch.endPoint || pitch.startPoint;
+    // Auto-advance logic: previous end becomes new start, clear end
+    const nextStart = pitch.endPoint ? { ...pitch.endPoint } : { ...pitch.startPoint };
     pitch.reset();
     pitch.startPoint = nextStart;
+    pitch.endPoint = null;
     pitch.draw();
+
+    // Update coords display to show new start (no end yet)
+    document.getElementById('pitch-coords').innerText = `Start: ${nextStart.x},${nextStart.y} | End: None`;
     
     goalFace.reset();
     document.getElementById('action-notes').value = '';

@@ -296,11 +296,14 @@ function loadEventsFromStorage() {
 }
 
 // --- Persist pitch points, selected players, and UI state ---
+let _restoringSession = false; // Flag to prevent saving during restore
+
 function getSessionKey() {
     return activeMatch ? `cac_session_${activeMatch.match_id}` : null;
 }
 
 function saveSessionState() {
+    if (_restoringSession) return; // Don't overwrite while restoring
     const key = getSessionKey();
     if (!key) return;
     const session = {
@@ -526,6 +529,8 @@ export async function initTagger() {
     // 6. Restore session state (pitch points, players, dropdowns) from localStorage
     const savedSession = loadSessionState();
     if (savedSession) {
+        _restoringSession = true; // Prevent saveSessionState() from overwriting during restore
+
         // Restore pitch points
         if (savedSession.startPoint) {
             pitch.startPoint = savedSession.startPoint;
@@ -544,14 +549,22 @@ export async function initTagger() {
         if (savedSession.homeDirection) currentState.homeDirection = savedSession.homeDirection;
         if (savedSession.isPressureOn !== undefined) currentState.isPressureOn = savedSession.isPressureOn;
 
-        // Restore dropdowns
+        // Restore dropdowns — must set action first (rebuilds outcomes), then outcome (rebuilds types), then type
         if (savedSession.action && actionSelect.querySelector(`option[value="${savedSession.action}"]`)) {
             actionSelect.value = savedSession.action;
-            actionSelect.dispatchEvent(new Event('change'));
+            // Manually rebuild outcomes without triggering save
+            outcomeSelect.innerHTML = '';
+            Object.keys(CAC_LOGIC[savedSession.action]).forEach(out => outcomeSelect.add(new Option(out, out)));
+            // Toggle Goal Face and Shot Metadata
+            document.getElementById('goal-face-overlay').style.display = savedSession.action === 'Shoot' ? 'flex' : 'none';
+            document.getElementById('shot-metadata-overlay').style.display = savedSession.action === 'Shoot' ? 'flex' : 'none';
         }
         if (savedSession.outcome && outcomeSelect.querySelector(`option[value="${savedSession.outcome}"]`)) {
             outcomeSelect.value = savedSession.outcome;
-            outcomeSelect.dispatchEvent(new Event('change'));
+            // Manually rebuild types
+            typeSelect.innerHTML = '';
+            const types = CAC_LOGIC[savedSession.action]?.[savedSession.outcome] || [];
+            types.forEach(t => { if (t !== 'NA') typeSelect.add(new Option(t, t)); });
         }
         if (savedSession.type && typeSelect.querySelector(`option[value="${savedSession.type}"]`)) {
             typeSelect.value = savedSession.type;
@@ -563,6 +576,8 @@ export async function initTagger() {
         // Update UI to reflect restored state
         updateLineupState();
         directionBtn.innerText = `➡ Direct: ${currentState.homeDirection}`;
+
+        _restoringSession = false; // Re-enable saving
         console.log('Session state restored from localStorage');
     }
 

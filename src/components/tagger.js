@@ -348,6 +348,7 @@ export async function initTagger() {
     // Restore any unsynced events from localStorage (survives page reload)
     if (localEvents.length === 0) {
         loadEventsFromStorage();
+        renderStaging(); // Re-render immediately so restored events show in the log table
     }
     document.getElementById('match-title').innerText = `${match.home_team.team_name} vs ${match.away_team.team_name}`;
     document.getElementById('match-subtitle').innerText = `Match ID: ${match.match_id.split('-')[0]}... | ${match.is_futsal ? 'Futsal' : 'Football'}`;

@@ -581,7 +581,8 @@ async function loadMatchEvents(matchId) {
                 Body_Part: d.body_part, Pressure_On: d.pressure_on ? 'Yes' : 'No',
                 Start_X: d.start_x, Start_Y: d.start_y, End_X: d.end_x, End_Y: d.end_y, End_Z: d.end_z,
                 Team_Direction: d.team_direction, Notes: d.notes,
-                Player_ID: d.player_id, Reaction_Player_ID: d.reaction_player_id, Is_Futsal: d.is_futsal
+                Player_ID: d.player_id, Reaction_Player_ID: d.reaction_player_id, Is_Futsal: d.is_futsal,
+                Shot_Technique: d.shot_technique, First_Time_Shot: d.first_time_shot, Assist_Type: d.assist_type
             })));
             if (!data || data.length < 1000) fetchMore = false;
             rangeStart += 1000;
@@ -879,7 +880,10 @@ async function executeProcessing() {
                 action: r.Action || 'Unknown', outcome: r.Action_Outcome || 'Unknown',
                 type: r.Sub_Action_Outcome || null, body_part: r.Body_Part || null,
                 player_id: r.Player_ID, reaction_player_id: r.Reaction_Player_ID || null,
-                is_futsal: isMatchFutsal, pressure_on: r.Pressure_On === 'Yes'
+                is_futsal: isMatchFutsal, pressure_on: r.Pressure_On === 'Yes',
+                shot_technique: r.Shot_Technique || null,
+                first_time_shot: r.First_Time_Shot != null ? parseInt(r.First_Time_Shot) : null,
+                assist_type: r.Assist_Type || null
             };
         });
 

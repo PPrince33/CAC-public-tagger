@@ -11,10 +11,10 @@ function buildExportRows(data) {
         'Body Part': e.body_part || '',
         'Act Team': e.act_team_name || '',
         'Act Player': e.act_player_name || '',
-        'Act Jersey': e.act_jersey_no ?? '',
+        'Act Jersey': e.act_jersey_no != null ? Math.round(Number(e.act_jersey_no)) : '',
         'React Team': e.react_team_name || '',
         'React Player': e.react_player_name || '',
-        'React Jersey': e.react_jersey_no ?? '',
+        'React Jersey': e.react_jersey_no != null ? Math.round(Number(e.react_jersey_no)) : '',
         'Direction': e.team_direction || 'L2R',
         'Start X': e.start_x,
         'Start Y': e.start_y,
@@ -22,6 +22,9 @@ function buildExportRows(data) {
         'End Y': e.end_y ?? '',
         'End Z': e.end_z ?? '',
         'Pressure': e.pressure_on ? 'Yes' : 'No',
+        'Shot Technique': e.shot_technique || '',
+        'First Time Shot': e.first_time_shot ?? '',
+        'Assist Type': e.assist_type || '',
     }));
 }
 

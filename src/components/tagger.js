@@ -41,13 +41,6 @@ export function TaggerView() {
                         <div id="video-wrapper" style="aspect-ratio: 16/9; background: #000;">
                             <div id="video-container" style="width: 100%; height: 100%;"></div>
                         </div>
-                        <div id="video-controls" style="padding: 12px; display: flex; justify-content: space-between; gap: 8px; background: var(--bg-card); border-top: 1px solid var(--border);">
-                            <div style="display: flex; gap: 4px;">
-                                <button id="popout-btn" class="btn btn-ghost" style="width: auto; padding: 6px 12px; font-size: 0.75rem;">🪟 Pop Out</button>
-                                <button id="ptz-btn" class="btn btn-ghost" style="width: auto; padding: 6px 12px; font-size: 0.75rem;">🔍 PTZ: OFF</button>
-                                <button id="reset-ptz-btn" class="btn btn-ghost" style="width: auto; padding: 6px 12px; font-size: 0.75rem;">Reset PTZ</button>
-                            </div>
-                        </div>
                     </div>
 
                     <!-- Staging Table -->
@@ -85,6 +78,10 @@ export function TaggerView() {
                         <canvas id="pitch-canvas" width="480" height="320" style="width: 100%; max-width: 480px; border-radius: var(--radius-sm);"></canvas>
                         <div id="pitch-coords" style="margin-top: 8px; font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-muted);">Start: None | End: None</div>
                         <div id="pitch-players" style="margin-top: 4px; font-size: 0.75rem; color: var(--text-main); font-weight: 600;"></div>
+                        <div style="display: flex; gap: 8px; margin-top: 8px;">
+                            <button id="clear-pitch-btn" class="btn btn-ghost" style="width: auto; padding: 4px 12px; font-size: 0.7rem; border: 1px solid var(--border);">Clear Pitch</button>
+                            <button id="deselect-players-btn" class="btn btn-ghost" style="width: auto; padding: 4px 12px; font-size: 0.7rem; border: 1px solid var(--border);">Deselect Players</button>
+                        </div>
                     </div>
                     
                     <!-- Goal Face Overlay (Conditional) -->
@@ -92,6 +89,41 @@ export function TaggerView() {
                          <h4 style="margin-bottom: 8px; font-size: 0.875rem;">Shot Placement (Goal Face)</h4>
                          <canvas id="goal-face-canvas" width="400" height="200" style="width: 100%; max-width: 400px; border-radius: var(--radius-sm);"></canvas>
                          <div id="goal-coords" style="margin-top: 8px; font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-muted);">End_Z: None | Y_Off: None</div>
+                    </div>
+
+                    <!-- Shot Metadata (Conditional - only for Shoot) -->
+                    <div id="shot-metadata-overlay" class="card" style="display: none; padding: 12px; flex-direction: column; border-color: var(--warning); flex-shrink: 0;">
+                        <h4 style="margin-bottom: 8px; font-size: 0.875rem;">Shot Details</h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
+                            <div class="form-group">
+                                <label class="form-label">Shot Technique</label>
+                                <select id="shot-technique-select" class="form-input">
+                                    <option value="Normal" selected>Normal</option>
+                                    <option value="Volley">Volley</option>
+                                    <option value="Half-volley">Half-volley</option>
+                                    <option value="Header">Header</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">First Time Shot</label>
+                                <select id="first-time-shot-select" class="form-input">
+                                    <option value="0" selected>0 (No)</option>
+                                    <option value="1">1 (Yes)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Assist Type</label>
+                                <select id="assist-type-select" class="form-input">
+                                    <option value="Normal Pass" selected>Normal Pass</option>
+                                    <option value="Cross">Cross</option>
+                                    <option value="Through ball">Through ball</option>
+                                    <option value="Rebound">Rebound</option>
+                                    <option value="Corner">Corner</option>
+                                    <option value="Free Kick">Free Kick</option>
+                                    <option value="Penalty">Penalty</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Action Controls -->
@@ -209,8 +241,8 @@ export function TaggerView() {
                     transition: all 0.2s ease;
                 }
                 .player-btn:hover { background: var(--hover-bg); }
-                .player-btn.action-active { background: var(--accent); color: white; border-color: var(--accent); }
-                .player-btn.reaction-active { background: var(--success); color: white; border-color: var(--success); }
+                .player-btn.action-active { background: #22c55e; color: white; border-color: #22c55e; }
+                .player-btn.reaction-active { background: #ef4444; color: white; border-color: #ef4444; }
                 .player-btn.disabled { opacity: 0.3; cursor: not-allowed; }
             </style>
         </div>
@@ -382,8 +414,9 @@ export async function initTagger() {
         Object.keys(CAC_LOGIC[act]).forEach(out => outcomeSelect.add(new Option(out, out)));
         updateTypes();
         
-        // Toggle Goal Face
+        // Toggle Goal Face and Shot Metadata
         document.getElementById('goal-face-overlay').style.display = act === 'Shoot' ? 'flex' : 'none';
+        document.getElementById('shot-metadata-overlay').style.display = act === 'Shoot' ? 'flex' : 'none';
         updateLineupState();
     };
 
@@ -432,6 +465,18 @@ export async function initTagger() {
         directionBtn.innerText = `➡ Direct: ${currentState.homeDirection}`;
     });
 
+    document.getElementById('clear-pitch-btn').addEventListener('click', () => {
+        pitch.reset();
+        pitch.draw();
+        document.getElementById('pitch-coords').innerText = 'Start: None | End: None';
+    });
+
+    document.getElementById('deselect-players-btn').addEventListener('click', () => {
+        currentState.actionPlayer = null;
+        currentState.reactionPlayer = null;
+        updateLineupState();
+    });
+
     document.getElementById('toggle-sidebar-btn').addEventListener('click', () => {
         const sidebar = document.querySelector('.sidebar');
         if (sidebar) {
@@ -456,18 +501,6 @@ export async function initTagger() {
             video = new VideoEngine('video-container', 'local');
             video.loadLocalFile(e.target.files[0]);
         }
-    });
-
-    document.getElementById('popout-btn').addEventListener('click', () => video.togglePopOut());
-    
-    document.getElementById('ptz-btn').addEventListener('click', (e) => {
-        const isActive = video.togglePTZ();
-        e.target.innerText = isActive ? "🔍 PTZ: ON" : "🔍 PTZ: OFF";
-        e.target.style.background = isActive ? "var(--success)" : "transparent";
-    });
-    
-    document.getElementById('reset-ptz-btn').addEventListener('click', () => {
-        video.resetPTZ();
     });
 
     addEventBtn.addEventListener('click', logEvent);
@@ -636,9 +669,9 @@ function handleHotkeys(e) {
     } else if (key === 't') { 
         actionSelect.value = 'Through Ball'; 
         actionSelect.dispatchEvent(new Event('change')); 
-    } else if (key === 'u') { 
+    } else if (key === 'u') {
         if (['Pass', 'Through Ball'].includes(actionSelect.value)) {
-            outcomeSelect.value = 'Unsuccessful'; 
+            outcomeSelect.value = 'Missed';
             outcomeSelect.dispatchEvent(new Event('change'));
         }
     } else if (key === 'l') { 
@@ -720,6 +753,9 @@ async function logEventWithNote(kickoffNote) {
         notes: finalNotes || null,
         is_futsal: activeMatch.is_futsal,
         pressure_on: currentState.isPressureOn,
+        shot_technique: actionVal === 'Shoot' ? document.getElementById('shot-technique-select').value : null,
+        first_time_shot: actionVal === 'Shoot' ? parseInt(document.getElementById('first-time-shot-select').value) : null,
+        assist_type: actionVal === 'Shoot' ? document.getElementById('assist-type-select').value : null,
         _ui_player: `${currentState.actionPlayer.name} (${currentState.actionPlayer.jersey})`,
         _ui_reaction_player: currentState.reactionPlayer ? `${currentState.reactionPlayer.name} (${currentState.reactionPlayer.jersey})` : null
     };
@@ -739,35 +775,87 @@ async function logEventWithNote(kickoffNote) {
     
     goalFace.reset();
     document.getElementById('action-notes').value = '';
-    
+
+    // Reset shot metadata fields
+    document.getElementById('shot-technique-select').value = 'Normal';
+    document.getElementById('first-time-shot-select').value = '0';
+    document.getElementById('assist-type-select').value = 'Normal Pass';
+
     // Keep pressure state for next entry (user preference)
 
-    // Reset Action to Pass/Successful/Normal and Body Part to Right Leg
+    // Save previous state for auto-suggestion
+    const prevAction = actionVal;
+    const prevOutcome = document.getElementById('outcome-select').value;
+    const prevType = document.getElementById('type-select').value;
+    const prevActionPlayer = currentState.actionPlayer ? { ...currentState.actionPlayer } : null;
+    const prevReactionPlayer = currentState.reactionPlayer ? { ...currentState.reactionPlayer } : null;
+
+    // Determine next action, outcome, and player suggestions based on context
+    let nextAction = 'Pass';
+    let nextOutcome = 'Successful';
+    let nextType = null; // null means pick first available
+    let nextActionPlayer = null;
+    let nextReactionPlayer = null;
+
+    const isTackle = prevAction === 'Standing Tackle' || prevAction === 'Sliding Tackle';
+
+    if ((prevAction === 'Pass' || prevAction === 'Through Ball') && prevOutcome === 'Intercepted') {
+        // Intercepted pass/through ball → next is Pass Intercept
+        nextAction = 'Pass Intercept';
+        nextOutcome = null; // first available
+        nextActionPlayer = null; // tagger must manually select interceptor
+        nextReactionPlayer = prevActionPlayer; // the passer whose ball was intercepted
+    } else if (prevAction === 'Shoot' && prevOutcome === 'Save') {
+        // Shot saved → next is Save by goalkeeper
+        nextAction = 'Save';
+        nextOutcome = null;
+        nextActionPlayer = prevReactionPlayer; // goalkeeper
+        nextReactionPlayer = prevActionPlayer; // shooter
+    } else if (prevAction === 'Shoot' && prevOutcome === 'Block') {
+        // Shot blocked → next is Block by blocker
+        nextAction = 'Block';
+        nextOutcome = null;
+        nextActionPlayer = prevReactionPlayer; // blocker
+        nextReactionPlayer = prevActionPlayer; // shooter
+    } else if (isTackle && prevOutcome === 'Successful' && prevType === 'With Possession') {
+        // Tackle successful with possession → same action player keeps ball
+        nextActionPlayer = prevActionPlayer;
+    } else if (isTackle && prevOutcome === 'Successful' && prevType === 'Without Possession') {
+        // Tackle successful without possession → no auto-suggestion
+        nextActionPlayer = null;
+    } else if (isTackle && prevOutcome === 'Unsuccessful') {
+        // Tackle unsuccessful → no auto-suggestion
+        nextActionPlayer = null;
+    } else {
+        // Default: reaction player becomes next action player (possession flow)
+        if (prevReactionPlayer) {
+            nextActionPlayer = prevReactionPlayer;
+        } else {
+            nextActionPlayer = prevActionPlayer;
+        }
+    }
+
+    // Apply next action/outcome/type to dropdowns
     const actionSelect = document.getElementById('action-select');
-    actionSelect.value = 'Pass';
+    actionSelect.value = nextAction;
     actionSelect.dispatchEvent(new Event('change'));
-    // After change event fires and populates outcomes, set Successful
+
     const outcomeSelect = document.getElementById('outcome-select');
-    if (outcomeSelect.querySelector('option[value="Successful"]')) {
-        outcomeSelect.value = 'Successful';
+    if (nextOutcome && outcomeSelect.querySelector(`option[value="${nextOutcome}"]`)) {
+        outcomeSelect.value = nextOutcome;
         outcomeSelect.dispatchEvent(new Event('change'));
     }
-    // After change event fires and populates types, set Normal
+
     const typeSelect = document.getElementById('type-select');
-    if (typeSelect.querySelector('option[value="Normal"]')) {
-        typeSelect.value = 'Normal';
+    if (nextType && typeSelect.querySelector(`option[value="${nextType}"]`)) {
+        typeSelect.value = nextType;
     }
+
     document.getElementById('body-part-select').value = 'Right Leg';
 
-    // If reaction existed, make them the next action player (Possession flow)
-    if (currentState.reactionPlayer) {
-        const nextAction = { ...currentState.reactionPlayer };
-        currentState.actionPlayer = nextAction;
-        currentState.reactionPlayer = null;
-    } else {
-        // Keep current action player for now or clear? 
-        // Typically taggers keep the player selected for consecutive actions.
-    }
+    // Apply player suggestions
+    currentState.actionPlayer = nextActionPlayer;
+    currentState.reactionPlayer = nextReactionPlayer;
     updateLineupState();
 }
 

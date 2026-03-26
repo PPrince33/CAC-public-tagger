@@ -3,7 +3,8 @@ export const CAC_LOGIC = {
         "Successful": ["Normal Pass", "Goalkick", "Goalkeeper Throw", "Corner Kick", "Free Kick", "Throw-in", "Penalty"],
         "Assist": ["Normal Pass", "Goalkick", "Goalkeeper Throw", "Corner Kick", "Free Kick", "Throw-in", "Penalty"],
         "Key Pass": ["Normal Pass", "Goalkick", "Goalkeeper Throw", "Corner Kick", "Free Kick", "Throw-in", "Penalty"],
-        "Unsuccessful": ["Normal Pass", "Goalkick", "Goalkeeper Throw", "Corner Kick", "Free Kick", "Throw-in", "Penalty"],
+        "Missed": ["Normal Pass", "Goalkick", "Goalkeeper Throw", "Corner Kick", "Free Kick", "Throw-in", "Penalty"],
+        "Intercepted": ["Normal Pass", "Goalkick", "Goalkeeper Throw", "Corner Kick", "Free Kick", "Throw-in", "Penalty"],
         "Off-Side": ["Normal Pass", "Goalkick", "Goalkeeper Throw", "Corner Kick", "Free Kick", "Penalty"]
     },
     "Ball Control": {
@@ -56,7 +57,8 @@ export const CAC_LOGIC = {
     },
     "Through Ball": {
         "Successful": ["Normal", "Assist", "Key Pass"],
-        "Unsuccessful": ["Normal", "Off-Side"]
+        "Missed": ["Normal", "Off-Side"],
+        "Intercepted": ["Normal"]
     },
     "Discipline": {
         "Foul": ["No Card", "Yellow Card", "Red Card"]

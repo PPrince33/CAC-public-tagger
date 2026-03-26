@@ -241,9 +241,10 @@ export function TaggerView() {
                     transition: all 0.2s ease;
                 }
                 .player-btn:hover { background: var(--hover-bg); }
-                .player-btn.action-active { background: #22c55e; color: white; border-color: #22c55e; }
-                .player-btn.reaction-active { background: #ef4444; color: white; border-color: #ef4444; }
+                .player-btn.action-active { background: #22c55e !important; color: white !important; border-color: #22c55e !important; }
+                .player-btn.reaction-active { background: #ef4444 !important; color: white !important; border-color: #ef4444 !important; }
                 .player-btn.disabled { opacity: 0.3; cursor: not-allowed; }
+                .dial-btn { width: 26px; height: 26px; min-width: 26px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 0.65rem; }
             </style>
         </div>
     `;
@@ -566,7 +567,7 @@ function renderPlayerGrids() {
     const renderDialGrid = (dialEl, teamId) => {
         const players = activeLineup.filter(l => l.team_id === teamId).sort(sortPlayers);
         dialEl.innerHTML = players.map(p => `
-            <button class="player-btn p-${p.player_id}" style="width: 26px; height: 26px; min-width: 26px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 0.65rem;"
+            <button class="player-btn dial-btn p-${p.player_id}"
                 title="${p.players.player_name} (${p.players.position})"
                 onclick="window.taggerSelectPlayer('${p.player_id}', '${p.team_id}', '${p.players.player_name}', '${p.jersey_no}'); document.getElementById('player-dial').style.display='none';">
                 ${p.jersey_no}

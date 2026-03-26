@@ -33,12 +33,12 @@ export class GoalFaceCanvas {
         const gw = this.config.goalWidth;
 
         let z = gh * ((this.canvas.height - 20 - clickY) / innerH);
-        z = Math.round(Math.max(0, z * 100) / 100 * 1); // Keep 2 decimal places or round to int? 
-        // PRD says "ALL pitch coordinates" to be INTEGER. Z is also a coordinate.
-        z = Math.round(z);
+        // Clamp z between 0 and goal height, keep 2 decimal places
+        z = Math.round(Math.max(0, Math.min(z, gh)) * 100) / 100;
 
         let yOffsetRaw = gw * ((clickX - pad) / innerW) - (gw / 2);
-        yOffsetRaw = Math.round(yOffsetRaw);
+        // Clamp yOffset between -goalWidth/2 and +goalWidth/2, keep 2 decimal places
+        yOffsetRaw = Math.round(Math.max(-gw / 2, Math.min(yOffsetRaw, gw / 2)) * 100) / 100;
         
         this.shotTarget = { yOffset: yOffsetRaw, z: z };
         

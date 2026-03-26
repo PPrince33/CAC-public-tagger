@@ -295,6 +295,41 @@ function loadEventsFromStorage() {
     }
 }
 
+// --- Persist pitch points, selected players, and UI state ---
+function getSessionKey() {
+    return activeMatch ? `cac_session_${activeMatch.match_id}` : null;
+}
+
+function saveSessionState() {
+    const key = getSessionKey();
+    if (!key) return;
+    const session = {
+        startPoint: pitch ? pitch.startPoint : null,
+        endPoint: pitch ? pitch.endPoint : null,
+        actionPlayer: currentState.actionPlayer,
+        reactionPlayer: currentState.reactionPlayer,
+        isPressureOn: currentState.isPressureOn,
+        homeDirection: currentState.homeDirection,
+        action: document.getElementById('action-select')?.value || 'Pass',
+        outcome: document.getElementById('outcome-select')?.value || 'Successful',
+        type: document.getElementById('type-select')?.value || null,
+        bodyPart: document.getElementById('body-part-select')?.value || 'Right Leg',
+    };
+    localStorage.setItem(key, JSON.stringify(session));
+}
+
+function loadSessionState() {
+    const key = getSessionKey();
+    if (!key) return null;
+    try {
+        const saved = localStorage.getItem(key);
+        if (saved) return JSON.parse(saved);
+    } catch (e) {
+        console.warn('Failed to restore session state:', e);
+    }
+    return null;
+}
+
 export async function initTagger() {
     // Maximize viewport for Tagger specifically
     const mainView = document.getElementById('main-view');
@@ -401,16 +436,17 @@ export async function initTagger() {
 
     pitch.onCoordsChange = (start, end, e) => {
         document.getElementById('pitch-coords').innerText = `Start: ${start ? start.x+','+start.y : 'None'} | End: ${end ? end.x+','+end.y : 'None'}`;
-        
+        saveSessionState();
+
         if (e && e.clientX && e.clientY) {
             const dial = document.getElementById('player-dial');
             dial.style.display = 'block';
-            
+
             let left = e.clientX + 15;
             let top = e.clientY + 15;
             if (left + 280 > window.innerWidth) left = e.clientX - 295;
             if (top + 150 > window.innerHeight) top = e.clientY - 165;
-            
+
             dial.style.left = `${left}px`;
             dial.style.top = `${top}px`;
         }
@@ -467,8 +503,8 @@ export async function initTagger() {
         });
     };
 
-    actionSelect.addEventListener('change', updateOutcomes);
-    outcomeSelect.addEventListener('change', updateTypes);
+    actionSelect.addEventListener('change', () => { updateOutcomes(); saveSessionState(); });
+    outcomeSelect.addEventListener('change', () => { updateTypes(); saveSessionState(); });
     updateOutcomes();
 
     // 4. Fetch Lineups
@@ -487,6 +523,49 @@ export async function initTagger() {
     // Load previously synced events from DB
     await loadSyncedEvents();
 
+    // 6. Restore session state (pitch points, players, dropdowns) from localStorage
+    const savedSession = loadSessionState();
+    if (savedSession) {
+        // Restore pitch points
+        if (savedSession.startPoint) {
+            pitch.startPoint = savedSession.startPoint;
+        }
+        if (savedSession.endPoint) {
+            pitch.endPoint = savedSession.endPoint;
+        }
+        pitch.draw();
+        document.getElementById('pitch-coords').innerText = `Start: ${pitch.startPoint ? pitch.startPoint.x+','+pitch.startPoint.y : 'None'} | End: ${pitch.endPoint ? pitch.endPoint.x+','+pitch.endPoint.y : 'None'}`;
+
+        // Restore selected players
+        if (savedSession.actionPlayer) currentState.actionPlayer = savedSession.actionPlayer;
+        if (savedSession.reactionPlayer) currentState.reactionPlayer = savedSession.reactionPlayer;
+
+        // Restore direction and pressure
+        if (savedSession.homeDirection) currentState.homeDirection = savedSession.homeDirection;
+        if (savedSession.isPressureOn !== undefined) currentState.isPressureOn = savedSession.isPressureOn;
+
+        // Restore dropdowns
+        if (savedSession.action && actionSelect.querySelector(`option[value="${savedSession.action}"]`)) {
+            actionSelect.value = savedSession.action;
+            actionSelect.dispatchEvent(new Event('change'));
+        }
+        if (savedSession.outcome && outcomeSelect.querySelector(`option[value="${savedSession.outcome}"]`)) {
+            outcomeSelect.value = savedSession.outcome;
+            outcomeSelect.dispatchEvent(new Event('change'));
+        }
+        if (savedSession.type && typeSelect.querySelector(`option[value="${savedSession.type}"]`)) {
+            typeSelect.value = savedSession.type;
+        }
+        if (savedSession.bodyPart) {
+            document.getElementById('body-part-select').value = savedSession.bodyPart;
+        }
+
+        // Update UI to reflect restored state
+        updateLineupState();
+        directionBtn.innerText = `➡ Direct: ${currentState.homeDirection}`;
+        console.log('Session state restored from localStorage');
+    }
+
     // 5. Setup Action Handlers
     // Restore pressure button visual if state persisted
     pressureBtn.innerText = `💥 Pressure: ${currentState.isPressureOn ? 'ON' : 'OFF'}`;
@@ -501,12 +580,14 @@ export async function initTagger() {
     directionBtn.addEventListener('click', () => {
         currentState.homeDirection = currentState.homeDirection === 'L2R' ? 'R2L' : 'L2R';
         directionBtn.innerText = `➡ Direct: ${currentState.homeDirection}`;
+        saveSessionState();
     });
 
     document.getElementById('clear-pitch-btn').addEventListener('click', () => {
         pitch.reset();
         pitch.draw();
         document.getElementById('pitch-coords').innerText = 'Start: None | End: None';
+        saveSessionState();
     });
 
     document.getElementById('deselect-players-btn').addEventListener('click', () => {
@@ -677,6 +758,7 @@ function updateLineupState() {
         if (currentState.reactionPlayer) txt += `  |  🛡 ${currentState.reactionPlayer.name} #${currentState.reactionPlayer.jersey}`;
         pitchPlayers.innerText = txt || '';
     }
+    saveSessionState();
 }
 
 function handleHotkeys(e) {

@@ -702,17 +702,30 @@ async function logEventWithNote(kickoffNote) {
         alert("Mark an End Point on the pitch");
         return;
     }
+    if (rule.reaction === "Same" && !currentState.reactionPlayer) {
+        alert("Reaction Player is required (must be SAME team).");
+        return;
+    }
     if (rule.reaction === "Same" && currentState.reactionPlayer && currentState.reactionPlayer.teamId !== currentState.actionPlayer.teamId) {
         alert("Reaction Player must be on the SAME team.");
         return;
     }
-    if (rule.reaction === "Opposite" && (!currentState.reactionPlayer || currentState.reactionPlayer.teamId === currentState.actionPlayer.teamId)) {
+    if (rule.reaction === "Opposite" && !currentState.reactionPlayer) {
+        alert("Reaction Player is required (must be OPPONENT team).");
+        return;
+    }
+    if (rule.reaction === "Opposite" && currentState.reactionPlayer.teamId === currentState.actionPlayer.teamId) {
         alert("Reaction Player must be on the OPPONENT team.");
         return;
     }
     if (rule.reaction === "OppositeOrNone" && currentState.reactionPlayer && currentState.reactionPlayer.teamId === currentState.actionPlayer.teamId) {
         alert("Reaction Player must be on the OPPONENT team or None.");
         return;
+    }
+    if (rule.reaction === "None" && currentState.reactionPlayer) {
+        // Auto-clear invalid reaction player for actions that don't allow one
+        currentState.reactionPlayer = null;
+        updateLineupState();
     }
 
     const typeVal = document.getElementById('type-select').value || null;

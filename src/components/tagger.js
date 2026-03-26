@@ -508,6 +508,7 @@ export async function initTagger() {
 
     actionSelect.addEventListener('change', () => { updateOutcomes(); saveSessionState(); });
     outcomeSelect.addEventListener('change', () => { updateTypes(); saveSessionState(); });
+    _restoringSession = true; // Block saves during initial setup so we don't overwrite saved session
     updateOutcomes();
 
     // 4. Fetch Lineups
@@ -529,7 +530,7 @@ export async function initTagger() {
     // 6. Restore session state (pitch points, players, dropdowns) from localStorage
     const savedSession = loadSessionState();
     if (savedSession) {
-        _restoringSession = true; // Prevent saveSessionState() from overwriting during restore
+        // _restoringSession is already true (set before updateOutcomes)
 
         // Restore pitch points
         if (savedSession.startPoint) {
@@ -579,6 +580,8 @@ export async function initTagger() {
 
         _restoringSession = false; // Re-enable saving
         console.log('Session state restored from localStorage');
+    } else {
+        _restoringSession = false; // Re-enable saving even if no session found
     }
 
     // 5. Setup Action Handlers

@@ -691,24 +691,33 @@ function renderPlayerGrids() {
 
     const renderGrid = (gridEl, teamId) => {
         const players = activeLineup.filter(l => l.team_id === teamId).sort(sortPlayers);
-        gridEl.innerHTML = players.map(p => `
-            <button class="player-btn p-${p.player_id}" 
-                title="${p.players.player_name} (${p.players.position})"
-                onclick="window.taggerSelectPlayer('${p.player_id}', '${p.team_id}', '${p.players.player_name}', '${p.jersey_no}')">
-                ${p.jersey_no}
-            </button>
-        `).join('');
+        gridEl.innerHTML = '';
+        players.forEach(p => {
+            const btn = document.createElement('button');
+            btn.className = `player-btn p-${p.player_id}`;
+            btn.title = `${p.players.player_name} (${p.players.position})`;
+            btn.textContent = p.jersey_no;
+            btn.addEventListener('click', () => {
+                window.taggerSelectPlayer(p.player_id, p.team_id, p.players.player_name, p.jersey_no);
+            });
+            gridEl.appendChild(btn);
+        });
     };
 
     const renderDialGrid = (dialEl, teamId) => {
         const players = activeLineup.filter(l => l.team_id === teamId).sort(sortPlayers);
-        dialEl.innerHTML = players.map(p => `
-            <button class="player-btn dial-btn p-${p.player_id}"
-                title="${p.players.player_name} (${p.players.position})"
-                onclick="window.taggerSelectPlayer('${p.player_id}', '${p.team_id}', '${p.players.player_name}', '${p.jersey_no}'); document.getElementById('player-dial').style.display='none';">
-                ${p.jersey_no}
-            </button>
-        `).join('');
+        dialEl.innerHTML = '';
+        players.forEach(p => {
+            const btn = document.createElement('button');
+            btn.className = `player-btn dial-btn p-${p.player_id}`;
+            btn.title = `${p.players.player_name} (${p.players.position})`;
+            btn.textContent = p.jersey_no;
+            btn.addEventListener('click', () => {
+                window.taggerSelectPlayer(p.player_id, p.team_id, p.players.player_name, p.jersey_no);
+                document.getElementById('player-dial').style.display = 'none';
+            });
+            dialEl.appendChild(btn);
+        });
     };
 
     renderGrid(homeGrid, activeMatch.home_team_id);
@@ -866,6 +875,24 @@ async function logEventWithNote(kickoffNote) {
         updateLineupState();
     }
 
+    // Validate action is in the allowed list
+    if (!CAC_LOGIC[actionVal]) {
+        alert("Invalid action selected.");
+        return;
+    }
+
+    // Validate coordinates are within pitch bounds
+    const maxX = activeMatch.is_futsal ? 40 : 120;
+    const maxY = activeMatch.is_futsal ? 20 : 80;
+    if (pitch.startPoint) {
+        pitch.startPoint.x = Math.max(0, Math.min(pitch.startPoint.x, maxX));
+        pitch.startPoint.y = Math.max(0, Math.min(pitch.startPoint.y, maxY));
+    }
+    if (pitch.endPoint) {
+        pitch.endPoint.x = Math.max(0, Math.min(pitch.endPoint.x, maxX));
+        pitch.endPoint.y = Math.max(0, Math.min(pitch.endPoint.y, maxY));
+    }
+
     const typeVal = document.getElementById('type-select').value || null;
     if (actionVal === 'Match Time' && typeVal === 'Kick-Off' && !kickoffNote) {
         document.getElementById('kickoff-team-name').innerText = activeMatch.home_team.team_name;
@@ -874,6 +901,11 @@ async function logEventWithNote(kickoffNote) {
     }
 
     const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+        alert("Session expired. Please log in again.");
+        window.location.hash = '#login';
+        return;
+    }
     const outcome = document.getElementById('outcome-select').value;
     
     let autoNote = "";
@@ -1104,11 +1136,41 @@ async function syncEvents() {
     // Remove UI helper fields
     const payload = localEvents.map(({ _ui_player, _ui_reaction_player, ...rest }) => rest);
 
-    const { error } = await supabase.from('match_events').insert(payload);
+    // Batch insert in chunks of 500 for reliability with large event sets
+    const BATCH_SIZE = 500;
+    let allSuccess = true;
+    let lastError = null;
 
-    if (error) {
-        alert("Sync Error: " + error.message);
-        btn.innerText = 'Sync Retry';
+    for (let i = 0; i < payload.length; i += BATCH_SIZE) {
+        const batch = payload.slice(i, i + BATCH_SIZE);
+        let retries = 3;
+        let success = false;
+
+        while (retries > 0 && !success) {
+            const { error } = await supabase.from('match_events').insert(batch);
+            if (error) {
+                retries--;
+                lastError = error;
+                if (retries > 0) {
+                    btn.innerText = `Retrying... (${3 - retries}/3)`;
+                    await new Promise(r => setTimeout(r, 1000)); // Wait 1s before retry
+                }
+            } else {
+                success = true;
+            }
+        }
+
+        if (!success) {
+            allSuccess = false;
+            break;
+        }
+
+        btn.innerText = `Syncing... ${Math.min(i + BATCH_SIZE, payload.length)}/${payload.length}`;
+    }
+
+    if (!allSuccess) {
+        alert("Sync Error: " + (lastError?.message || 'Unknown error. Your data is safe in local storage.'));
+        btn.innerText = '⚠ Sync Retry';
         btn.disabled = false;
     } else {
         // Move synced events to the synced list with their UI labels

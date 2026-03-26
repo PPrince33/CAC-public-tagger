@@ -1,6 +1,30 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = 'https://pxhbxewnijavotdwiueo.supabase.co'
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4aGJ4ZXduaWphdm90ZHdpdWVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzNjIwODIsImV4cCI6MjA4OTkzODA4Mn0.UD55F-XT43KYbZpKRiwuD70eSNLpJvAQT5n-V5bYL00'
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Missing Supabase environment variables. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.')
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+    },
+    global: {
+        headers: {
+            'x-client-info': 'cac-tagger/1.0',
+        },
+    },
+    // Connection pooling for concurrent users
+    db: {
+        schema: 'public',
+    },
+    realtime: {
+        params: {
+            eventsPerSecond: 10,
+        },
+    },
+})

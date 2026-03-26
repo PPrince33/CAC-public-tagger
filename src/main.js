@@ -6,12 +6,21 @@ import { router } from './router'
 const savedTheme = localStorage.getItem('cac-theme') || 'light';
 document.documentElement.setAttribute('data-theme', savedTheme);
 
+// HTML escape utility — prevents XSS in all template literals
+function esc(str) {
+    if (str == null) return '';
+    const div = document.createElement('div');
+    div.textContent = String(str);
+    return div.innerHTML;
+}
+
 class App {
     constructor() {
         this.appElement = document.getElementById('app');
         this.user = null;
+        this.userRole = null;
 
-        // Global error handling for debugging
+        // Global error handling
         window.addEventListener('error', (e) => this.showFatalError(e.message));
         window.addEventListener('unhandledrejection', (e) => this.showFatalError(e.reason?.message || e.reason));
 
@@ -19,12 +28,12 @@ class App {
     }
 
     showFatalError(msg) {
-        console.error("Fatal Error:", msg);
+        console.error('Fatal Error:', msg);
         if (this.appElement) {
             this.appElement.innerHTML = `
                 <div style="padding: 40px; text-align: center; color: var(--danger);">
                     <h2 style="margin-bottom: 16px;">App Load Failed</h2>
-                    <p style="color: var(--text-muted); margin-bottom: 24px;">${msg}</p>
+                    <p style="color: var(--text-muted); margin-bottom: 24px;">${esc(msg)}</p>
                     <button onclick="location.reload()" class="btn btn-primary" style="width: auto;">Try Refreshing</button>
                 </div>
             `;
@@ -32,28 +41,43 @@ class App {
     }
 
     async init() {
-        // Initial session check
         const { data: { session } } = await supabase.auth.getSession();
-        this.handleAuthChange(session?.user ?? null);
+        await this.handleAuthChange(session?.user ?? null);
 
-        // Listen for auth changes
-        supabase.auth.onAuthStateChange((_event, session) => {
-            this.handleAuthChange(session?.user ?? null);
+        supabase.auth.onAuthStateChange(async (_event, session) => {
+            // Handle password recovery flow
+            if (_event === 'PASSWORD_RECOVERY') {
+                window.location.hash = '#reset-password';
+            }
+            await this.handleAuthChange(session?.user ?? null);
         });
 
-        // Initial route handling
         window.addEventListener('hashchange', () => this.render());
         this.render();
     }
 
-    handleAuthChange(user) {
+    async handleAuthChange(user) {
         this.user = user;
-        // If not logged in and not on auth page, redirect to login
-        if (!user && !['#login', '#register'].includes(window.location.hash)) {
+        this.userRole = null;
+
+        if (user) {
+            // Fetch role once on auth change
+            try {
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('role')
+                    .eq('id', user.id)
+                    .single();
+                this.userRole = profile?.role || 'analyst';
+            } catch (e) {
+                this.userRole = 'analyst';
+            }
+        }
+
+        const publicRoutes = ['#login', '#register', '#forgot-password', '#reset-password'];
+        if (!user && !publicRoutes.includes(window.location.hash.split('?')[0])) {
             window.location.hash = '#login';
-        } 
-        // If logged in and on auth page, redirect to home
-        else if (user && ['#login', '#register'].includes(window.location.hash)) {
+        } else if (user && publicRoutes.includes(window.location.hash.split('?')[0]) && window.location.hash !== '#reset-password') {
             window.location.hash = '#create-match';
         }
         this.render();
@@ -63,12 +87,19 @@ class App {
         const hash = window.location.hash || '#create-match';
         const route = router.getRoute(hash);
 
+        // Auth guard
         if (route.requiresAuth && !this.user) {
             window.location.hash = '#login';
             return;
         }
 
-        // Render main layout
+        // Admin guard — server-side role check, not just client-side
+        if (route.requiresAdmin && this.userRole !== 'admin') {
+            window.location.hash = '#create-match';
+            return;
+        }
+
+        // Unauthenticated layout
         if (!this.user) {
             this.appElement.innerHTML = `
                 <div class="auth-overlay">
@@ -78,6 +109,11 @@ class App {
             const authContent = document.getElementById('auth-content');
             authContent.innerHTML = await route.component();
         } else {
+            // Authenticated layout
+            const displayName = esc(this.user.user_metadata?.username ?? 'User');
+            const avatarLetter = esc(this.user.email?.[0]?.toUpperCase() ?? 'U');
+            const roleName = esc(this.userRole || 'Analyst');
+
             this.appElement.innerHTML = `
                 <div class="app-container">
                     <aside class="sidebar">
@@ -94,7 +130,10 @@ class App {
                             <a href="#qc" class="nav-item ${hash === '#qc' ? 'active' : ''}">
                                 <span>✅</span> QC Portal
                             </a>
-                            <div id="admin-nav"></div>
+                            ${this.userRole === 'admin' ? `
+                            <a href="#admin" class="nav-item ${hash.startsWith('#admin') ? 'active' : ''}">
+                                <span>⚙️</span> Admin Portal
+                            </a>` : ''}
                         </nav>
                         <div class="sidebar-footer">
                             <div class="theme-toggle">
@@ -105,10 +144,10 @@ class App {
                                 </label>
                             </div>
                             <div class="user-profile">
-                                <div class="user-avatar">${this.user.email?.[0].toUpperCase() ?? 'U'}</div>
+                                <div class="user-avatar">${avatarLetter}</div>
                                 <div class="user-info">
-                                    <div class="user-name">${this.user.user_metadata?.username ?? 'User'}</div>
-                                    <div class="user-role" id="user-role-display">Analyzing...</div>
+                                    <div class="user-name">${displayName}</div>
+                                    <div class="user-role">${roleName}</div>
                                 </div>
                             </div>
                             <button class="btn btn-ghost" id="logout-btn">
@@ -122,16 +161,13 @@ class App {
                 </div>
             `;
 
-            // Render view component
             const mainView = document.getElementById('main-view');
             mainView.innerHTML = await route.component();
 
-            // Set up logout
             document.getElementById('logout-btn').addEventListener('click', () => {
                 supabase.auth.signOut();
             });
 
-            // Set up theme toggle
             const themeCheckbox = document.getElementById('theme-checkbox');
             if (themeCheckbox) {
                 themeCheckbox.addEventListener('change', () => {
@@ -142,37 +178,9 @@ class App {
                     if (label) label.textContent = isDark ? '🌙 Dark' : '☀️ Light';
                 });
             }
-
-            // Fetch role if needed
-            this.updateRoleDisplay();
         }
 
-        // Re-attach component-level listeners if any
         if (route.onRender) route.onRender();
-    }
-
-    async updateRoleDisplay() {
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', this.user.id)
-            .single();
-        
-        if (profile) {
-            const roleEl = document.getElementById('user-role-display');
-            if (roleEl) roleEl.innerText = profile.role;
-
-            if (profile.role === 'admin') {
-                const adminNav = document.getElementById('admin-nav');
-                if (adminNav) {
-                    adminNav.innerHTML = `
-                        <a href="#admin" class="nav-item ${window.location.hash === '#admin' ? 'active' : ''}">
-                            <span>⚙️</span> Admin Portal
-                        </a>
-                    `;
-                }
-            }
-        }
     }
 }
 

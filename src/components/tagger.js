@@ -264,6 +264,37 @@ let currentState = {
     homeDirection: 'L2R', // 'L2R' or 'R2L'
 };
 
+// --- LocalStorage persistence for unsynced events ---
+function getStorageKey() {
+    return activeMatch ? `cac_unsync_${activeMatch.match_id}` : null;
+}
+
+function saveEventsToStorage() {
+    const key = getStorageKey();
+    if (key && localEvents.length > 0) {
+        localStorage.setItem(key, JSON.stringify(localEvents));
+    } else if (key) {
+        localStorage.removeItem(key);
+    }
+}
+
+function loadEventsFromStorage() {
+    const key = getStorageKey();
+    if (!key) return;
+    try {
+        const saved = localStorage.getItem(key);
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                localEvents = parsed;
+                console.log(`Restored ${localEvents.length} unsynced events from localStorage`);
+            }
+        }
+    } catch (e) {
+        console.warn('Failed to restore events from localStorage:', e);
+    }
+}
+
 export async function initTagger() {
     // Maximize viewport for Tagger specifically
     const mainView = document.getElementById('main-view');
@@ -313,6 +344,11 @@ export async function initTagger() {
     }
 
     activeMatch = match;
+
+    // Restore any unsynced events from localStorage (survives page reload)
+    if (localEvents.length === 0) {
+        loadEventsFromStorage();
+    }
     document.getElementById('match-title').innerText = `${match.home_team.team_name} vs ${match.away_team.team_name}`;
     document.getElementById('match-subtitle').innerText = `Match ID: ${match.match_id.split('-')[0]}... | ${match.is_futsal ? 'Futsal' : 'Football'}`;
     document.getElementById('home-team-name').innerText = match.home_team.team_name;
@@ -775,8 +811,9 @@ async function logEventWithNote(kickoffNote) {
     };
 
     localEvents.push(event);
+    saveEventsToStorage();
     renderStaging();
-    
+
     // Auto-advance logic: previous end becomes new start, clear end
     const nextStart = pitch.endPoint ? { ...pitch.endPoint } : { ...pitch.startPoint };
     pitch.reset();
@@ -930,6 +967,7 @@ function renderStaging() {
 
     window.removeStagedEvent = (idx) => {
         localEvents.splice(idx, 1);
+        saveEventsToStorage();
         renderStaging();
     };
 }
@@ -975,6 +1013,7 @@ async function syncEvents() {
         // Move synced events to the synced list with their UI labels
         syncedEvents = [...localEvents, ...syncedEvents];
         localEvents = [];
+        saveEventsToStorage(); // Clear localStorage after successful sync
         renderStaging();
         btn.innerText = '☁ Synced';
         setTimeout(() => {

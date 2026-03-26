@@ -95,16 +95,18 @@ export class PitchCanvas {
             ctx.beginPath();
             ctx.arc(sx(this.endPoint.x), sy(this.endPoint.y), 6, 0, 2 * Math.PI);
             ctx.fill();
-            
-            // Draw line
-            ctx.strokeStyle = "rgba(255,255,255,0.6)";
-            ctx.lineWidth = 1;
-            ctx.setLineDash([5, 5]);
-            ctx.beginPath();
-            ctx.moveTo(sx(this.startPoint.x), sy(this.startPoint.y));
-            ctx.lineTo(sx(this.endPoint.x), sy(this.endPoint.y));
-            ctx.stroke();
-            ctx.setLineDash([]);
+
+            // Draw line only if start point also exists
+            if (this.startPoint) {
+                ctx.strokeStyle = "rgba(255,255,255,0.6)";
+                ctx.lineWidth = 1;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(sx(this.startPoint.x), sy(this.startPoint.y));
+                ctx.lineTo(sx(this.endPoint.x), sy(this.endPoint.y));
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
         }
     }
 

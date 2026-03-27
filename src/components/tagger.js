@@ -1058,7 +1058,7 @@ function updateLineupState() {
     if (pitchPlayers) {
         let txt = '';
         if (currentState.actionPlayer) txt += `ACT: ${currentState.actionPlayer.name} #${currentState.actionPlayer.jersey}`;
-        if (currentState.reactionPlayer) txt += `  |  DEF: ${currentState.reactionPlayer.name} #${currentState.reactionPlayer.jersey}`;
+        if (currentState.reactionPlayer) txt += `  |  RCT: ${currentState.reactionPlayer.name} #${currentState.reactionPlayer.jersey}`;
         pitchPlayers.innerText = txt || '';
     }
     saveSessionState();
@@ -1370,7 +1370,7 @@ function renderStaging() {
                 <td style="padding: 6px;">${e.pressure_on ? 'Y' : 'N'}</td>
                 <td style="padding: 6px; white-space: nowrap;">
                     ACT: ${playerDisplay}<br>
-                    ${reactionDisplay ? '<span style="color:var(--text-muted);font-size:0.65rem;">DEF: '+reactionDisplay+'</span>' : ''}
+                    ${reactionDisplay ? '<span style="color:var(--text-muted);font-size:0.65rem;">RCT: '+reactionDisplay+'</span>' : ''}
                 </td>
                 <td style="padding: 6px; font-family: var(--font-mono); font-size: 0.65rem; white-space: nowrap;">
                     S: ${e.start_x},${e.start_y}<br>

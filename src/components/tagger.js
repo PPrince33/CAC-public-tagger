@@ -323,6 +323,7 @@ let syncedEvents = []; // Declared early: referenced by updateProgress() before 
 let undoStack = []; // For undo functionality
 let lockHeartbeatInterval = null;
 let autoSyncPending = false;
+let _navCleanup = null; // Stored reference for hashchange cleanup listener
 let currentState = {
     actionPlayer: null,
     reactionPlayer: null,
@@ -594,11 +595,14 @@ export async function initTagger() {
     document.addEventListener('keydown', handleHotkeys);
 
     // Clean up hotkey listener when navigating away from tagger
-    const cleanupOnNav = () => {
+    if (_navCleanup) window.removeEventListener('hashchange', _navCleanup);
+    _navCleanup = () => {
         document.removeEventListener('keydown', handleHotkeys);
-        window.removeEventListener('hashchange', cleanupOnNav);
+        if (video) video.cleanup?.();
+        window.removeEventListener('hashchange', _navCleanup);
+        _navCleanup = null;
     };
-    window.addEventListener('hashchange', cleanupOnNav);
+    window.addEventListener('hashchange', _navCleanup);
 
     // Re-render local events IMMEDIATELY so they don't vanish while fetching
     renderStaging();

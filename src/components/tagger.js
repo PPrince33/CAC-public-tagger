@@ -1046,7 +1046,7 @@ function updateLineupState() {
 
             if (rule.reaction === "None" && !isSamePlayer) btn.classList.add('disabled');
             if (rule.reaction === "Same" && !isSameTeam && !isSamePlayer) btn.classList.add('disabled');
-            if (rule.reaction === "Opposite" && isSameTeam) btn.classList.add('disabled');
+            if ((rule.reaction === "Opposite" || rule.reaction === "OppositeOrNone") && isSameTeam) btn.classList.add('disabled');
             if (isSamePlayer && currentState.reactionPlayer) btn.classList.add('disabled');
         }
     });
@@ -1162,6 +1162,10 @@ async function logEventWithNote(kickoffNote) {
     }
     if (rule.reaction === "Opposite" && currentState.reactionPlayer.teamId === currentState.actionPlayer.teamId) {
         alert("Reaction Player must be on the OPPONENT team.");
+        return;
+    }
+    if (rule.reaction === "OppositeOrNone" && currentState.reactionPlayer && currentState.reactionPlayer.teamId === currentState.actionPlayer.teamId) {
+        alert("Reaction Player must be on the OPPONENT team or None.");
         return;
     }
     if (rule.reaction === "None" && currentState.reactionPlayer) {

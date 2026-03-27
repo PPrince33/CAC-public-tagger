@@ -40,6 +40,11 @@ export const router = {
             onRender: () => import('./components/qcPortal').then(m => m.initQCPortal?.()),
             requiresAuth: true
         },
+        '#analytics': {
+            component: () => import('./components/analytics').then(m => m.AnalyticsView()),
+            onRender: () => import('./components/analytics').then(m => m.initAnalytics?.()),
+            requiresAuth: true
+        },
         '#admin': {
             component: () => import('./components/adminPortal').then(m => m.AdminPortalView()),
             onRender: () => import('./components/adminPortal').then(m => m.initAdminPortal?.()),

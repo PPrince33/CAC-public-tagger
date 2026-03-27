@@ -5,7 +5,7 @@ export class PitchCanvas {
         this.ctx = this.canvas.getContext('2d');
         this.isFutsal = isFutsal;
         this.updateConfig();
-        
+
         this.startPoint = null;
         this.endPoint = null;
         this.onCoordsChange = null;
@@ -20,6 +20,19 @@ export class PitchCanvas {
             this.config = { type: 'standard', maxX: 120, maxY: 80, goalWidth: 7.32, goalHeight: 2.44 };
         }
         this.draw();
+    }
+
+    // Theme-aware colors
+    getColors() {
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        return {
+            bg: isDark ? '#0f172a' : '#1e293b',
+            field: isDark ? '#1e3a2f' : '#334155',
+            lines: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.4)',
+            start: isDark ? '#4ade80' : '#10b981',      // brighter green in dark
+            end: isDark ? '#f87171' : '#ef4444',          // brighter red in dark
+            dashLine: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.6)',
+        };
     }
 
     handleClick(e) {
@@ -50,20 +63,21 @@ export class PitchCanvas {
         const p = this.config;
         const padX = p.maxX * 0.05;
         const padY = p.maxY * 0.05;
+        const c = this.getColors();
 
         const sx = (x) => (x + padX) * (this.canvas.width / (p.maxX + 2 * padX));
         const sy = (y) => this.canvas.height - ((y + padY) * (this.canvas.height / (p.maxY + 2 * padY)));
 
-        ctx.fillStyle = "#1e293b"; // Dark pitch background
+        ctx.fillStyle = c.bg;
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        
-        ctx.fillStyle = "#334155"; // Field grass color
+
+        ctx.fillStyle = c.field;
         ctx.fillRect(sx(0), sy(p.maxY), sx(p.maxX) - sx(0), sy(0) - sy(p.maxY));
 
-        ctx.strokeStyle = "rgba(255,255,255,0.4)";
+        ctx.strokeStyle = c.lines;
         ctx.lineWidth = 2;
         ctx.strokeRect(sx(0), sy(p.maxY), sx(p.maxX) - sx(0), sy(0) - sy(p.maxY));
-        
+
         ctx.beginPath();
         ctx.moveTo(sx(p.maxX / 2), sy(0));
         ctx.lineTo(sx(p.maxX / 2), sy(p.maxY));
@@ -85,20 +99,20 @@ export class PitchCanvas {
 
         // Draw points
         if (this.startPoint) {
-            ctx.fillStyle = "#10b981"; // Success/Start green
+            ctx.fillStyle = c.start;
             ctx.beginPath();
             ctx.arc(sx(this.startPoint.x), sy(this.startPoint.y), 6, 0, 2 * Math.PI);
             ctx.fill();
         }
         if (this.endPoint) {
-            ctx.fillStyle = "#ef4444"; // Danger/End red
+            ctx.fillStyle = c.end;
             ctx.beginPath();
             ctx.arc(sx(this.endPoint.x), sy(this.endPoint.y), 6, 0, 2 * Math.PI);
             ctx.fill();
 
             // Draw line only if start point also exists
             if (this.startPoint) {
-                ctx.strokeStyle = "rgba(255,255,255,0.6)";
+                ctx.strokeStyle = c.dashLine;
                 ctx.lineWidth = 1;
                 ctx.setLineDash([5, 5]);
                 ctx.beginPath();

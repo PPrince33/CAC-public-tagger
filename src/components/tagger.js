@@ -7,32 +7,42 @@ import { VideoEngine } from '../lib/videoEngine'
 export function TaggerView() {
     return `
         <div class="fade-in tagger-app" style="height: calc(100vh - 32px); display: flex; flex-direction: column; gap: 16px;">
-            <header style="display: flex; justify-content: space-between; align-items: center; padding: 0 8px;">
+            <!-- Lock / Collaboration Banner -->
+            <div id="lock-banner" class="lock-banner" style="display: none;"></div>
+
+            <header class="tagger-header" style="display: flex; justify-content: space-between; align-items: center; padding: 0 8px; flex-wrap: wrap; gap: 8px;">
                 <div>
                     <h2 id="match-title" style="margin-bottom: 4px;">Loading Match...</h2>
                     <div id="match-subtitle" style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Match ID: ...</div>
                 </div>
-                <div style="display: flex; gap: 12px; align-items: center;">
-                    <button class="btn btn-ghost" style="width: auto; padding: 8px 16px; border: 1px solid var(--border);" id="toggle-sidebar-btn">👁️ Toggle Sidebar</button>
-                    <button class="btn btn-ghost" style="width: auto; padding: 8px 16px;" id="back-to-matches">⬅ Back</button>
-                    <button class="btn btn-primary" style="width: auto; padding: 8px 24px; background: var(--success);" id="finish-match-btn">🏁 Finish Match</button>
+                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                    <!-- Progress Indicator -->
+                    <div id="progress-indicator" style="display: flex; align-items: center; gap: 6px; font-size: 0.7rem; color: var(--text-muted); padding: 4px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-card);">
+                        <span id="progress-count">0</span> events |
+                        <span id="progress-time">0:00</span> tagged
+                    </div>
+                    <button class="btn btn-ghost" style="width: auto; padding: 6px 12px; border: 1px solid var(--border); font-size: 0.7rem;" id="undo-btn" title="Undo last event (Ctrl+Z)">Undo</button>
+                    <button class="btn btn-ghost" style="width: auto; padding: 6px 12px; border: 1px solid var(--border); font-size: 0.7rem;" id="shortcuts-btn" title="Keyboard shortcuts (?)">Keys [?]</button>
+                    <button class="btn btn-ghost" style="width: auto; padding: 6px 12px; border: 1px solid var(--border); font-size: 0.7rem;" id="toggle-sidebar-btn">Toggle Sidebar</button>
+                    <button class="btn btn-ghost" style="width: auto; padding: 6px 12px; font-size: 0.7rem;" id="back-to-matches">Back</button>
+                    <button class="btn btn-primary" style="width: auto; padding: 6px 16px; background: var(--success); font-size: 0.7rem;" id="finish-match-btn">Finish Match</button>
                 </div>
             </header>
 
-            <div style="flex-grow: 1; display: grid; grid-template-columns: 1fr 480px; gap: 16px; min-height: 0;">
+            <div class="tagger-layout" style="flex-grow: 1; display: grid; grid-template-columns: 1fr 480px; gap: 16px; min-height: 0;">
                 <!-- Left Column: Video & Log -->
                 <div style="display: flex; flex-direction: column; gap: 16px; overflow-y: auto; padding-right: 8px;">
                     <!-- Video Source Bar -->
                     <div class="card" style="padding: 12px; flex-shrink: 0;">
-                        <div style="display: flex; gap: 8px; align-items: center;">
+                        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                             <select id="video-source-select" class="form-input" style="width: 120px; padding: 6px 10px; font-size: 0.75rem;">
                                 <option value="youtube">YouTube</option>
                                 <option value="local">Local File</option>
                             </select>
-                            <input type="text" id="video-url-input" class="form-input" style="flex: 1; padding: 6px 10px; font-size: 0.75rem;" placeholder="Paste YouTube URL here...">
+                            <input type="text" id="video-url-input" class="form-input" style="flex: 1; min-width: 150px; padding: 6px 10px; font-size: 0.75rem;" placeholder="Paste YouTube URL here...">
                             <button id="load-video-btn" class="btn btn-primary" style="width: auto; padding: 6px 16px; font-size: 0.75rem;">Load</button>
                             <input type="file" id="local-video-file" style="display: none;" accept="video/*">
-                            <button id="upload-local-btn" class="btn btn-ghost" style="width: auto; padding: 6px 12px; font-size: 0.75rem; display: none;">📂 Browse</button>
+                            <button id="upload-local-btn" class="btn btn-ghost" style="width: auto; padding: 6px 12px; font-size: 0.75rem; display: none;">Browse</button>
                         </div>
                     </div>
 
@@ -45,9 +55,12 @@ export function TaggerView() {
 
                     <!-- Staging Table -->
                     <div class="card" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 16px; min-height: 300px; flex-shrink: 0;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
                             <h4 style="margin:0;">Event Log</h4>
-                            <button id="sync-btn" class="btn btn-ghost" style="width: auto; padding: 4px 12px; font-size: 0.75rem; color: var(--success);">☁ Sync All</button>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <span id="sync-status" style="font-size: 0.7rem; color: var(--text-muted);"></span>
+                                <button id="sync-btn" class="btn btn-ghost" style="width: auto; padding: 4px 12px; font-size: 0.75rem; color: var(--success);">Sync All</button>
+                            </div>
                         </div>
                         <div style="flex-grow: 1; overflow-y: auto; font-size: 0.75rem;">
                             <table style="width: 100%; border-collapse: collapse;">
@@ -72,7 +85,7 @@ export function TaggerView() {
                 </div>
 
                 <!-- Right Column: Pitch, Actions, Lineups -->
-                <div style="display: flex; flex-direction: column; gap: 16px; min-height: 0; overflow-y: auto;">
+                <div class="tagger-right-col" style="display: flex; flex-direction: column; gap: 16px; min-height: 0; overflow-y: auto;">
                     <!-- Pitch Canvas -->
                     <div class="card" style="padding: 12px; display: flex; flex-direction: column; align-items: center; flex-shrink: 0;">
                         <canvas id="pitch-canvas" width="480" height="320" style="width: 100%; max-width: 480px; border-radius: var(--radius-sm);"></canvas>
@@ -83,7 +96,7 @@ export function TaggerView() {
                             <button id="deselect-players-btn" class="btn btn-ghost" style="width: auto; padding: 4px 12px; font-size: 0.7rem; border: 1px solid var(--border);">Deselect Players</button>
                         </div>
                     </div>
-                    
+
                     <!-- Goal Face Overlay (Conditional) -->
                     <div id="goal-face-overlay" class="card" style="display: none; padding: 12px; flex-direction: column; align-items: center; border-color: var(--accent); flex-shrink: 0;">
                          <h4 style="margin-bottom: 8px; font-size: 0.875rem;">Shot Placement (Goal Face)</h4>
@@ -156,10 +169,10 @@ export function TaggerView() {
                         </div>
                         <div style="margin-bottom: 12px; display: flex; gap: 8px; align-items: center;">
                             <button id="pressure-btn" class="btn btn-ghost" style="width: auto; flex: 1; border: 1px solid var(--border); padding: 8px;">
-                                💥 Pressure: OFF
+                                Pressure: OFF
                             </button>
                             <button id="direction-btn" class="btn btn-ghost" style="width: auto; flex: 1; border: 1px solid var(--border); padding: 8px;">
-                                ➡ Direct: L2R
+                                Direct: L2R
                             </button>
                         </div>
                         <div class="form-group">
@@ -192,12 +205,12 @@ export function TaggerView() {
                 </div>
             </div>
             </div>
-            
+
             <!-- Player Suggestion Dial -->
             <div id="player-dial" class="card" style="display: none; position: fixed; z-index: 4000; padding: 12px; width: 280px; box-shadow: var(--shadow-lg);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                     <strong style="font-size: 0.75rem;">Quick Select Player</strong>
-                    <button onclick="document.getElementById('player-dial').style.display='none'" style="background:none;border:none;color:var(--text-muted);cursor:pointer;">✖</button>
+                    <button onclick="document.getElementById('player-dial').style.display='none'" style="background:none;border:none;color:var(--text-muted);cursor:pointer;">X</button>
                 </div>
                 <div>
                     <div id="dial-home-name" style="font-size: 0.65rem; color: var(--accent); margin-bottom: 4px; font-weight: 700;">HOME</div>
@@ -208,18 +221,51 @@ export function TaggerView() {
                     <div id="dial-away-players" style="display: flex; gap: 4px; overflow-x: auto; padding-bottom: 4px;"></div>
                 </div>
             </div>
-            
+
             <!-- Kick-Off Direction Modal -->
             <div id="kickoff-modal" class="card" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 3000; width: 400px; box-shadow: var(--shadow-lg);">
-                <h3 style="margin-top: 0; color: var(--success);">⚽ Kick-Off Direction</h3>
+                <h3 style="margin-top: 0; color: var(--success);">Kick-Off Direction</h3>
                 <p>Which direction is <b id="kickoff-team-name" style="color:var(--accent); font-size: 1.125rem;">Home Team</b> playing right now?</p>
                 <div style="display: flex; gap: 12px; margin-top: 24px;">
-                    <button class="btn btn-primary" id="btn-ko-l2r" style="background: var(--success); flex: 1;">Left ➔ Right</button>
-                    <button class="btn btn-primary" id="btn-ko-r2l" style="background: var(--accent); flex: 1;">Right ➔ Left</button>
+                    <button class="btn btn-primary" id="btn-ko-l2r" style="background: var(--success); flex: 1;">Left -> Right</button>
+                    <button class="btn btn-primary" id="btn-ko-r2l" style="background: var(--accent); flex: 1;">Right -> Left</button>
                 </div>
                 <button class="btn btn-ghost" onclick="document.getElementById('kickoff-modal').style.display='none'" style="margin-top: 16px; width: 100%;">Cancel Adding Event</button>
             </div>
-            
+
+            <!-- Keyboard Shortcuts Modal -->
+            <div id="shortcuts-modal" style="display: none; position: fixed; inset: 0; z-index: 5000; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center;">
+                <div class="card" style="width: 500px; max-width: 90vw; max-height: 80vh; overflow-y: auto; padding: 24px; box-shadow: var(--shadow-lg);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h3 style="margin: 0;">Keyboard Shortcuts</h3>
+                        <button id="close-shortcuts" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text-muted);">X</button>
+                    </div>
+                    <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
+                        <thead>
+                            <tr style="border-bottom:2px solid var(--border);">
+                                <th style="padding:8px;text-align:left;color:var(--text-muted);">Key</th>
+                                <th style="padding:8px;text-align:left;color:var(--text-muted);">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td style="padding:6px 8px;"><kbd class="kbd">Space</kbd></td><td style="padding:6px 8px;">Play / Pause video</td></tr>
+                            <tr><td style="padding:6px 8px;"><kbd class="kbd">Arrow Right</kbd></td><td style="padding:6px 8px;">Skip forward 3s</td></tr>
+                            <tr><td style="padding:6px 8px;"><kbd class="kbd">Arrow Left</kbd></td><td style="padding:6px 8px;">Skip backward 3s</td></tr>
+                            <tr><td style="padding:6px 8px;"><kbd class="kbd">Enter</kbd></td><td style="padding:6px 8px;">Log Event</td></tr>
+                            <tr><td style="padding:6px 8px;"><kbd class="kbd">Ctrl+Z</kbd></td><td style="padding:6px 8px;">Undo last event</td></tr>
+                            <tr><td style="padding:6px 8px;"><kbd class="kbd">C</kbd></td><td style="padding:6px 8px;">Set action to Carry</td></tr>
+                            <tr><td style="padding:6px 8px;"><kbd class="kbd">P</kbd></td><td style="padding:6px 8px;">Set action to Pass Intercept</td></tr>
+                            <tr><td style="padding:6px 8px;"><kbd class="kbd">T</kbd></td><td style="padding:6px 8px;">Set action to Through Ball</td></tr>
+                            <tr><td style="padding:6px 8px;"><kbd class="kbd">U</kbd></td><td style="padding:6px 8px;">Set outcome to Missed (for Pass/Through Ball)</td></tr>
+                            <tr><td style="padding:6px 8px;"><kbd class="kbd">V</kbd></td><td style="padding:6px 8px;">Toggle Pressure ON/OFF</td></tr>
+                            <tr><td style="padding:6px 8px;"><kbd class="kbd">L</kbd></td><td style="padding:6px 8px;">Set body part to Left Leg</td></tr>
+                            <tr><td style="padding:6px 8px;"><kbd class="kbd">H</kbd></td><td style="padding:6px 8px;">Set body part to Head</td></tr>
+                            <tr><td style="padding:6px 8px;"><kbd class="kbd">?</kbd> or <kbd class="kbd">F1</kbd></td><td style="padding:6px 8px;">Show this shortcuts overlay</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <style>
                 .player-grid {
                     display: grid;
@@ -245,26 +291,47 @@ export function TaggerView() {
                 .player-btn.reaction-active { background: #ef4444 !important; color: white !important; border-color: #ef4444 !important; }
                 .player-btn.disabled { opacity: 0.3; cursor: not-allowed; }
                 .dial-btn { width: 26px; height: 26px; min-width: 26px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 0.65rem; }
+                .kbd { display: inline-block; padding: 2px 8px; background: var(--primary-light); border: 1px solid var(--border); border-radius: 4px; font-family: var(--font-mono); font-size: 0.75rem; font-weight: 700; }
+                .lock-banner { padding: 8px 16px; font-size: 0.8rem; font-weight: 600; text-align: center; border-radius: var(--radius-md); margin-bottom: 4px; }
+                .editable-cell { cursor: pointer; border-bottom: 1px dashed var(--text-muted); }
+                .editable-cell:hover { background: var(--hover-bg); }
+
+                /* Mobile responsive for tagger */
+                @media (max-width: 1024px) {
+                    .tagger-layout { grid-template-columns: 1fr !important; }
+                    .tagger-right-col { order: -1; }
+                }
+                @media (max-width: 600px) {
+                    .tagger-header { flex-direction: column; align-items: flex-start; }
+                    .player-grid { grid-template-columns: repeat(4, 1fr) !important; }
+                }
             </style>
         </div>
     `;
 }
 
-// Global engine instances
+// ──────────────────────────────────────────
+// MODULE STATE
+// ──────────────────────────────────────────
 let pitch = null;
 let goalFace = null;
 let video = null;
 let activeMatch = null;
 let activeLineup = [];
 let localEvents = [];
+let undoStack = []; // For undo functionality
+let lockHeartbeatInterval = null;
+let autoSyncPending = false;
 let currentState = {
     actionPlayer: null,
     reactionPlayer: null,
     isPressureOn: false,
-    homeDirection: 'L2R', // 'L2R' or 'R2L'
+    homeDirection: 'L2R',
 };
 
-// --- LocalStorage persistence for unsynced events ---
+// ──────────────────────────────────────────
+// LOCAL STORAGE PERSISTENCE
+// ──────────────────────────────────────────
 function getStorageKey() {
     return activeMatch ? `cac_unsync_${activeMatch.match_id}` : null;
 }
@@ -295,15 +362,17 @@ function loadEventsFromStorage() {
     }
 }
 
-// --- Persist pitch points, selected players, and UI state ---
-let _restoringSession = false; // Flag to prevent saving during restore
+// ──────────────────────────────────────────
+// SESSION STATE PERSISTENCE
+// ──────────────────────────────────────────
+let _restoringSession = false;
 
 function getSessionKey() {
     return activeMatch ? `cac_session_${activeMatch.match_id}` : null;
 }
 
 function saveSessionState() {
-    if (_restoringSession) return; // Don't overwrite while restoring
+    if (_restoringSession) return;
     const key = getSessionKey();
     if (!key) return;
     const session = {
@@ -333,6 +402,171 @@ function loadSessionState() {
     return null;
 }
 
+// ──────────────────────────────────────────
+// MATCH LOCKING
+// ──────────────────────────────────────────
+async function acquireMatchLock(matchId) {
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return false;
+
+        const { data, error } = await supabase.rpc('acquire_match_lock', {
+            p_match_id: matchId,
+            p_user_id: user.id
+        });
+
+        if (error) {
+            console.warn('Lock RPC not available:', error.message);
+            return true; // Graceful fallback if RPC doesn't exist yet
+        }
+        return data === true;
+    } catch (e) {
+        console.warn('Lock acquisition failed:', e);
+        return true; // Fallback
+    }
+}
+
+async function refreshMatchLock(matchId) {
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        await supabase.rpc('refresh_match_lock', {
+            p_match_id: matchId,
+            p_user_id: user.id
+        });
+    } catch (e) {
+        // Silently fail
+    }
+}
+
+async function releaseMatchLock(matchId) {
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        await supabase.rpc('release_match_lock', {
+            p_match_id: matchId,
+            p_user_id: user.id
+        });
+    } catch (e) {
+        // Silently fail
+    }
+}
+
+function startLockHeartbeat(matchId) {
+    stopLockHeartbeat();
+    lockHeartbeatInterval = setInterval(() => refreshMatchLock(matchId), 2 * 60 * 1000); // Every 2 min
+}
+
+function stopLockHeartbeat() {
+    if (lockHeartbeatInterval) {
+        clearInterval(lockHeartbeatInterval);
+        lockHeartbeatInterval = null;
+    }
+}
+
+async function checkMatchLock(matchId) {
+    try {
+        const { data, error } = await supabase
+            .from('matches')
+            .select('locked_by, locked_at, profiles!locked_by(username)')
+            .eq('match_id', matchId)
+            .single();
+
+        if (error || !data) return null;
+        if (!data.locked_by) return null;
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (data.locked_by === user?.id) return null; // Our own lock
+
+        const lockAge = Date.now() - new Date(data.locked_at).getTime();
+        if (lockAge > 10 * 60 * 1000) return null; // Stale lock
+
+        return data.profiles?.username || 'Another analyst';
+    } catch (e) {
+        return null;
+    }
+}
+
+// ──────────────────────────────────────────
+// AUTO-SYNC
+// ──────────────────────────────────────────
+function setupAutoSync() {
+    window.addEventListener('cac-online', async () => {
+        if (localEvents.length > 0 && !autoSyncPending) {
+            autoSyncPending = true;
+            const syncStatus = document.getElementById('sync-status');
+            if (syncStatus) syncStatus.textContent = 'Reconnected! Auto-syncing...';
+            await syncEvents();
+            autoSyncPending = false;
+        }
+    });
+
+    // Update offline banner with event count
+    window.addEventListener('offline', () => {
+        updateOfflineBanner();
+    });
+}
+
+function updateOfflineBanner() {
+    const offlineText = document.getElementById('offline-text');
+    if (offlineText && !navigator.onLine && localEvents.length > 0) {
+        offlineText.textContent = `You are offline — ${localEvents.length} events saved locally`;
+    }
+}
+
+// ──────────────────────────────────────────
+// PROGRESS INDICATOR
+// ──────────────────────────────────────────
+function updateProgress() {
+    const countEl = document.getElementById('progress-count');
+    const timeEl = document.getElementById('progress-time');
+    if (!countEl || !timeEl) return;
+
+    const total = localEvents.length + syncedEvents.length;
+    countEl.textContent = total;
+
+    // Find max tagged time
+    const allEvents = [...localEvents, ...syncedEvents];
+    if (allEvents.length > 0) {
+        const maxTime = Math.max(...allEvents.map(e => e.match_time_seconds || 0));
+        const mins = Math.floor(maxTime / 60);
+        const secs = (maxTime % 60).toString().padStart(2, '0');
+        timeEl.textContent = `${mins}:${secs}`;
+    } else {
+        timeEl.textContent = '0:00';
+    }
+}
+
+// ──────────────────────────────────────────
+// UNDO
+// ──────────────────────────────────────────
+function undoLastEvent() {
+    if (localEvents.length === 0) return;
+    const removed = localEvents.pop();
+    undoStack.push(removed);
+    saveEventsToStorage();
+    renderStaging();
+    updateProgress();
+
+    const syncStatus = document.getElementById('sync-status');
+    if (syncStatus) {
+        syncStatus.textContent = 'Undone! Press Ctrl+Shift+Z to redo.';
+        setTimeout(() => { syncStatus.textContent = ''; }, 3000);
+    }
+}
+
+function redoLastEvent() {
+    if (undoStack.length === 0) return;
+    const restored = undoStack.pop();
+    localEvents.push(restored);
+    saveEventsToStorage();
+    renderStaging();
+    updateProgress();
+}
+
+// ──────────────────────────────────────────
+// INIT TAGGER
+// ──────────────────────────────────────────
 export async function initTagger() {
     // Maximize viewport for Tagger specifically
     const mainView = document.getElementById('main-view');
@@ -379,14 +613,38 @@ export async function initTagger() {
     // Prevent staging data from bleeding into a different match session
     if (activeMatch && activeMatch.match_id !== matchId) {
         localEvents = [];
+        undoStack = [];
     }
 
     activeMatch = match;
 
+    // ── Match Locking ──
+    const lockBanner = document.getElementById('lock-banner');
+    const lockedBy = await checkMatchLock(matchId);
+    if (lockedBy) {
+        lockBanner.style.display = 'block';
+        lockBanner.style.background = 'var(--warning)';
+        lockBanner.style.color = '#000';
+        lockBanner.innerHTML = `This match is being edited by <strong>${lockedBy}</strong>. Your changes may conflict.`;
+    }
+
+    const gotLock = await acquireMatchLock(matchId);
+    if (gotLock) {
+        startLockHeartbeat(matchId);
+    }
+
+    // Release lock when navigating away
+    const releaseLockOnLeave = () => {
+        releaseMatchLock(matchId);
+        stopLockHeartbeat();
+    };
+    window.addEventListener('hashchange', releaseLockOnLeave, { once: true });
+    window.addEventListener('beforeunload', releaseLockOnLeave);
+
     // Restore any unsynced events from localStorage (survives page reload)
     if (localEvents.length === 0) {
         loadEventsFromStorage();
-        renderStaging(); // Re-render immediately so restored events show in the log table
+        renderStaging();
     }
     document.getElementById('match-title').innerText = `${match.home_team.team_name} vs ${match.away_team.team_name}`;
     document.getElementById('match-subtitle').innerText = `Match ID: ${match.match_id.split('-')[0]}... | ${match.is_futsal ? 'Futsal' : 'Football'}`;
@@ -430,10 +688,8 @@ export async function initTagger() {
     loadVideoBtn.addEventListener('click', async () => {
         const url = videoUrlInput.value.trim();
         if (!url) return;
-        // Reinitialize video engine as youtube
         video = new VideoEngine('video-container', 'youtube');
         video.loadYouTube(url);
-        // Save URL to match in DB
         await supabase.from('matches').update({ video_url: url }).eq('match_id', matchId);
     });
 
@@ -454,7 +710,7 @@ export async function initTagger() {
             dial.style.top = `${top}px`;
         }
     };
-    
+
     goalFace.onShotChange = (target) => {
         let teamDir = 'L2R';
         if (currentState.actionPlayer) {
@@ -468,13 +724,13 @@ export async function initTagger() {
 
         const maxY = match.is_futsal ? 20 : 80;
         const maxX = match.is_futsal ? 40 : 120;
-        
+
         let endY = parseFloat((maxY / 2 + yOffset).toFixed(2));
         let endX = (teamDir === 'L2R') ? maxX : 0;
-        
+
         pitch.endPoint = { x: endX, y: endY };
         pitch.draw();
-        
+
         document.getElementById('goal-coords').innerText = `End_Z: ${target.z}m | End_Y: ${endY}`;
         document.getElementById('pitch-coords').innerText = `Start: ${pitch.startPoint ? pitch.startPoint.x.toFixed(1)+','+pitch.startPoint.y.toFixed(1) : 'None'} | End: ${endX},${endY}`;
     };
@@ -490,7 +746,7 @@ export async function initTagger() {
         outcomeSelect.innerHTML = '';
         Object.keys(CAC_LOGIC[act]).forEach(out => outcomeSelect.add(new Option(out, out)));
         updateTypes();
-        
+
         // Toggle Goal Face and Shot Metadata
         document.getElementById('goal-face-overlay').style.display = act === 'Shoot' ? 'flex' : 'none';
         document.getElementById('shot-metadata-overlay').style.display = act === 'Shoot' ? 'flex' : 'none';
@@ -508,7 +764,7 @@ export async function initTagger() {
 
     actionSelect.addEventListener('change', () => { updateOutcomes(); saveSessionState(); });
     outcomeSelect.addEventListener('change', () => { updateTypes(); saveSessionState(); });
-    _restoringSession = true; // Block saves during initial setup so we don't overwrite saved session
+    _restoringSession = true;
     updateOutcomes();
 
     // 4. Fetch Lineups
@@ -519,7 +775,7 @@ export async function initTagger() {
             players (player_name, position)
         `)
         .eq('match_id', matchId);
-    
+
     if (lErr) console.error(lErr);
     activeLineup = lineup || [];
     renderPlayerGrids();
@@ -527,42 +783,28 @@ export async function initTagger() {
     // Load previously synced events from DB
     await loadSyncedEvents();
 
-    // 6. Restore session state (pitch points, players, dropdowns) from localStorage
+    // 6. Restore session state from localStorage
     const savedSession = loadSessionState();
     if (savedSession) {
-        // _restoringSession is already true (set before updateOutcomes)
-
-        // Restore pitch points
-        if (savedSession.startPoint) {
-            pitch.startPoint = savedSession.startPoint;
-        }
-        if (savedSession.endPoint) {
-            pitch.endPoint = savedSession.endPoint;
-        }
+        if (savedSession.startPoint) pitch.startPoint = savedSession.startPoint;
+        if (savedSession.endPoint) pitch.endPoint = savedSession.endPoint;
         pitch.draw();
         document.getElementById('pitch-coords').innerText = `Start: ${pitch.startPoint ? pitch.startPoint.x+','+pitch.startPoint.y : 'None'} | End: ${pitch.endPoint ? pitch.endPoint.x+','+pitch.endPoint.y : 'None'}`;
 
-        // Restore selected players
         if (savedSession.actionPlayer) currentState.actionPlayer = savedSession.actionPlayer;
         if (savedSession.reactionPlayer) currentState.reactionPlayer = savedSession.reactionPlayer;
-
-        // Restore direction and pressure
         if (savedSession.homeDirection) currentState.homeDirection = savedSession.homeDirection;
         if (savedSession.isPressureOn !== undefined) currentState.isPressureOn = savedSession.isPressureOn;
 
-        // Restore dropdowns — must set action first (rebuilds outcomes), then outcome (rebuilds types), then type
         if (savedSession.action && actionSelect.querySelector(`option[value="${savedSession.action}"]`)) {
             actionSelect.value = savedSession.action;
-            // Manually rebuild outcomes without triggering save
             outcomeSelect.innerHTML = '';
             Object.keys(CAC_LOGIC[savedSession.action]).forEach(out => outcomeSelect.add(new Option(out, out)));
-            // Toggle Goal Face and Shot Metadata
             document.getElementById('goal-face-overlay').style.display = savedSession.action === 'Shoot' ? 'flex' : 'none';
             document.getElementById('shot-metadata-overlay').style.display = savedSession.action === 'Shoot' ? 'flex' : 'none';
         }
         if (savedSession.outcome && outcomeSelect.querySelector(`option[value="${savedSession.outcome}"]`)) {
             outcomeSelect.value = savedSession.outcome;
-            // Manually rebuild types
             typeSelect.innerHTML = '';
             const types = CAC_LOGIC[savedSession.action]?.[savedSession.outcome] || [];
             types.forEach(t => { if (t !== 'NA') typeSelect.add(new Option(t, t)); });
@@ -574,30 +816,28 @@ export async function initTagger() {
             document.getElementById('body-part-select').value = savedSession.bodyPart;
         }
 
-        // Update UI to reflect restored state
         updateLineupState();
-        directionBtn.innerText = `➡ Direct: ${currentState.homeDirection}`;
+        directionBtn.innerText = `Direct: ${currentState.homeDirection}`;
 
-        _restoringSession = false; // Re-enable saving
+        _restoringSession = false;
         console.log('Session state restored from localStorage');
     } else {
-        _restoringSession = false; // Re-enable saving even if no session found
+        _restoringSession = false;
     }
 
     // 5. Setup Action Handlers
-    // Restore pressure button visual if state persisted
-    pressureBtn.innerText = `💥 Pressure: ${currentState.isPressureOn ? 'ON' : 'OFF'}`;
+    pressureBtn.innerText = `Pressure: ${currentState.isPressureOn ? 'ON' : 'OFF'}`;
     pressureBtn.style.background = currentState.isPressureOn ? 'var(--danger)' : 'transparent';
 
     pressureBtn.addEventListener('click', () => {
         currentState.isPressureOn = !currentState.isPressureOn;
-        pressureBtn.innerText = `💥 Pressure: ${currentState.isPressureOn ? 'ON' : 'OFF'}`;
+        pressureBtn.innerText = `Pressure: ${currentState.isPressureOn ? 'ON' : 'OFF'}`;
         pressureBtn.style.background = currentState.isPressureOn ? 'var(--danger)' : 'transparent';
     });
 
     directionBtn.addEventListener('click', () => {
         currentState.homeDirection = currentState.homeDirection === 'L2R' ? 'R2L' : 'L2R';
-        directionBtn.innerText = `➡ Direct: ${currentState.homeDirection}`;
+        directionBtn.innerText = `Direct: ${currentState.homeDirection}`;
         saveSessionState();
     });
 
@@ -642,6 +882,21 @@ export async function initTagger() {
 
     addEventBtn.addEventListener('click', logEvent);
     syncBtn.addEventListener('click', syncEvents);
+
+    // Undo button
+    document.getElementById('undo-btn').addEventListener('click', undoLastEvent);
+
+    // Keyboard shortcuts modal
+    document.getElementById('shortcuts-btn').addEventListener('click', toggleShortcutsModal);
+    document.getElementById('close-shortcuts').addEventListener('click', () => {
+        document.getElementById('shortcuts-modal').style.display = 'none';
+    });
+    document.getElementById('shortcuts-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'shortcuts-modal') {
+            document.getElementById('shortcuts-modal').style.display = 'none';
+        }
+    });
+
     finishBtn.addEventListener('click', async () => {
         if (localEvents.length > 0) {
             if (!confirm("You have unsynced events. Finish match anyway?")) return;
@@ -650,7 +905,7 @@ export async function initTagger() {
             .from('matches')
             .update({ status: 'QC' })
             .eq('match_id', activeMatch.match_id);
-        
+
         if (!error) {
             alert("Match submitted to QC!");
             window.location.hash = '#matches';
@@ -661,24 +916,35 @@ export async function initTagger() {
     document.getElementById('btn-ko-l2r').addEventListener('click', () => {
         document.getElementById('kickoff-modal').style.display = 'none';
         currentState.homeDirection = 'L2R';
-        document.getElementById('direction-btn').innerText = `➡ Direct: L2R`;
+        document.getElementById('direction-btn').innerText = `Direct: L2R`;
         logEventWithNote(`Home Direction Set: L2R`);
     });
     document.getElementById('btn-ko-r2l').addEventListener('click', () => {
         document.getElementById('kickoff-modal').style.display = 'none';
         currentState.homeDirection = 'R2L';
-        document.getElementById('direction-btn').innerText = `➡ Direct: R2L`;
+        document.getElementById('direction-btn').innerText = `Direct: R2L`;
         logEventWithNote(`Home Direction Set: R2L`);
     });
 
-    // Keyboard Hotkeys
-    // (Already handled at start of initTagger)
+    // Setup auto-sync on reconnect
+    setupAutoSync();
+
+    // Update progress
+    updateProgress();
 }
 
+function toggleShortcutsModal() {
+    const modal = document.getElementById('shortcuts-modal');
+    modal.style.display = modal.style.display === 'flex' ? 'none' : 'flex';
+}
+
+// ──────────────────────────────────────────
+// PLAYER GRIDS
+// ──────────────────────────────────────────
 function renderPlayerGrids() {
     const homeGrid = document.getElementById('home-player-grid');
     const awayGrid = document.getElementById('away-player-grid');
-    
+
     const posOrder = { 'GK': 1, 'DF': 2, 'MF': 3, 'FW': 4 };
 
     const sortPlayers = (a, b) => {
@@ -722,7 +988,7 @@ function renderPlayerGrids() {
 
     renderGrid(homeGrid, activeMatch.home_team_id);
     renderGrid(awayGrid, activeMatch.away_team_id);
-    
+
     document.getElementById('dial-home-name').innerText = activeMatch.home_team.team_name;
     document.getElementById('dial-away-name').innerText = activeMatch.away_team.team_name;
     renderDialGrid(document.getElementById('dial-home-players'), activeMatch.home_team_id);
@@ -731,13 +997,12 @@ function renderPlayerGrids() {
     // Expose selectPlayer to window for the onclick handler
     window.taggerSelectPlayer = (playerId, teamId, name, jersey) => {
         const isAction = !currentState.actionPlayer || (currentState.actionPlayer.id === playerId);
-        
+
         if (isAction) {
             if (currentState.actionPlayer?.id === playerId) {
                 currentState.actionPlayer = null;
             } else {
                 currentState.actionPlayer = { id: playerId, teamId, name, jersey };
-                // If this is now a response, we might need a reaction player
             }
         } else {
             if (currentState.reactionPlayer?.id === playerId) {
@@ -762,8 +1027,7 @@ function updateLineupState() {
         if (currentState.actionPlayer?.id === pId) btn.classList.add('action-active');
         if (currentState.reactionPlayer?.id === pId) btn.classList.add('reaction-active');
 
-        // Validation logic for disabling players based on CAC rules
-        if (currentState.actionPlayer) {
+        if (currentState.actionPlayer && lineupItem) {
             const isSameTeam = lineupItem.team_id === currentState.actionPlayer.teamId;
             const isSamePlayer = pId === currentState.actionPlayer.id;
 
@@ -777,23 +1041,36 @@ function updateLineupState() {
     document.getElementById('action-player-lbl').innerText = currentState.actionPlayer ? `${currentState.actionPlayer.name} (#${currentState.actionPlayer.jersey})` : 'None';
     document.getElementById('reaction-player-lbl').innerText = currentState.reactionPlayer ? `${currentState.reactionPlayer.name} (#${currentState.reactionPlayer.jersey})` : 'None';
 
-    // Update pitch player display
     const pitchPlayers = document.getElementById('pitch-players');
     if (pitchPlayers) {
         let txt = '';
-        if (currentState.actionPlayer) txt += `⚡ ${currentState.actionPlayer.name} #${currentState.actionPlayer.jersey}`;
-        if (currentState.reactionPlayer) txt += `  |  🛡 ${currentState.reactionPlayer.name} #${currentState.reactionPlayer.jersey}`;
+        if (currentState.actionPlayer) txt += `ACT: ${currentState.actionPlayer.name} #${currentState.actionPlayer.jersey}`;
+        if (currentState.reactionPlayer) txt += `  |  DEF: ${currentState.reactionPlayer.name} #${currentState.reactionPlayer.jersey}`;
         pitchPlayers.innerText = txt || '';
     }
     saveSessionState();
 }
 
+// ──────────────────────────────────────────
+// HOTKEYS
+// ──────────────────────────────────────────
 function handleHotkeys(e) {
     if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
-    
+
     const key = e.key.toLowerCase();
     const actionSelect = document.getElementById('action-select');
     const outcomeSelect = document.getElementById('outcome-select');
+
+    // Ctrl+Z = Undo, Ctrl+Shift+Z = Redo
+    if ((e.ctrlKey || e.metaKey) && key === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+            redoLastEvent();
+        } else {
+            undoLastEvent();
+        }
+        return;
+    }
 
     if (e.code === 'Space') {
         e.preventDefault();
@@ -805,29 +1082,35 @@ function handleHotkeys(e) {
     } else if (e.code === 'Enter') {
         e.preventDefault();
         logEvent();
+    } else if (key === '?' || e.code === 'F1') {
+        e.preventDefault();
+        toggleShortcutsModal();
     } else if (key === 'v') {
         document.getElementById('pressure-btn').click();
-    } else if (key === 'c') { 
-        actionSelect.value = 'Carry'; 
-        actionSelect.dispatchEvent(new Event('change')); 
-    } else if (key === 'p') { 
-        actionSelect.value = 'Pass Intercept'; 
-        actionSelect.dispatchEvent(new Event('change')); 
-    } else if (key === 't') { 
-        actionSelect.value = 'Through Ball'; 
-        actionSelect.dispatchEvent(new Event('change')); 
+    } else if (key === 'c') {
+        actionSelect.value = 'Carry';
+        actionSelect.dispatchEvent(new Event('change'));
+    } else if (key === 'p') {
+        actionSelect.value = 'Pass Intercept';
+        actionSelect.dispatchEvent(new Event('change'));
+    } else if (key === 't') {
+        actionSelect.value = 'Through Ball';
+        actionSelect.dispatchEvent(new Event('change'));
     } else if (key === 'u') {
         if (['Pass', 'Through Ball'].includes(actionSelect.value)) {
             outcomeSelect.value = 'Missed';
             outcomeSelect.dispatchEvent(new Event('change'));
         }
-    } else if (key === 'l') { 
-        document.getElementById('body-part-select').value = 'Left Leg'; 
-    } else if (key === 'h') { 
-        document.getElementById('body-part-select').value = 'Head'; 
+    } else if (key === 'l') {
+        document.getElementById('body-part-select').value = 'Left Leg';
+    } else if (key === 'h') {
+        document.getElementById('body-part-select').value = 'Head';
     }
 }
 
+// ──────────────────────────────────────────
+// LOG EVENT
+// ──────────────────────────────────────────
 async function logEvent() {
     logEventWithNote("");
 }
@@ -870,18 +1153,16 @@ async function logEventWithNote(kickoffNote) {
         return;
     }
     if (rule.reaction === "None" && currentState.reactionPlayer) {
-        // Auto-clear invalid reaction player for actions that don't allow one
         currentState.reactionPlayer = null;
         updateLineupState();
     }
 
-    // Validate action is in the allowed list
     if (!CAC_LOGIC[actionVal]) {
         alert("Invalid action selected.");
         return;
     }
 
-    // Validate coordinates are within pitch bounds
+    // Validate coordinates
     const maxX = activeMatch.is_futsal ? 40 : 120;
     const maxY = activeMatch.is_futsal ? 20 : 80;
     if (pitch.startPoint) {
@@ -907,16 +1188,16 @@ async function logEventWithNote(kickoffNote) {
         return;
     }
     const outcome = document.getElementById('outcome-select').value;
-    
+
     let autoNote = "";
     if ((actionVal === 'Pass' && ['Assist', 'Key Pass'].includes(outcome)) || ['Shoot', 'Pass Intercept'].includes(actionVal)) {
         autoNote = "Check body part";
     }
-    
+
     let userNotes = document.getElementById('action-notes').value.trim();
     let finalNotes = autoNote ? (userNotes ? `${userNotes} | ${autoNote}` : autoNote) : userNotes;
     if (kickoffNote) finalNotes = finalNotes ? `${finalNotes} | ${kickoffNote}` : kickoffNote;
-    
+
     const event = {
         match_id: activeMatch.match_id,
         analyst_id: user.id,
@@ -944,28 +1225,27 @@ async function logEventWithNote(kickoffNote) {
     };
 
     localEvents.push(event);
+    undoStack = []; // Clear redo stack on new event
     saveEventsToStorage();
     renderStaging();
+    updateProgress();
+    updateOfflineBanner();
 
-    // Auto-advance logic: previous end becomes new start, clear end
+    // Auto-advance logic
     const nextStart = pitch.endPoint ? { ...pitch.endPoint } : { ...pitch.startPoint };
     pitch.reset();
     pitch.startPoint = nextStart;
     pitch.endPoint = null;
     pitch.draw();
 
-    // Update coords display to show new start (no end yet)
     document.getElementById('pitch-coords').innerText = `Start: ${nextStart.x},${nextStart.y} | End: None`;
-    
+
     goalFace.reset();
     document.getElementById('action-notes').value = '';
 
-    // Reset shot metadata fields
     document.getElementById('shot-technique-select').value = 'Normal';
     document.getElementById('first-time-shot-select').value = '0';
     document.getElementById('assist-type-select').value = 'Normal Pass';
-
-    // Keep pressure state for next entry (user preference)
 
     // Save previous state for auto-suggestion
     const prevAction = actionVal;
@@ -974,44 +1254,36 @@ async function logEventWithNote(kickoffNote) {
     const prevActionPlayer = currentState.actionPlayer ? { ...currentState.actionPlayer } : null;
     const prevReactionPlayer = currentState.reactionPlayer ? { ...currentState.reactionPlayer } : null;
 
-    // Determine next action, outcome, and player suggestions based on context
     let nextAction = 'Pass';
     let nextOutcome = 'Successful';
-    let nextType = null; // null means pick first available
+    let nextType = null;
     let nextActionPlayer = null;
     let nextReactionPlayer = null;
 
     const isTackle = prevAction === 'Standing Tackle' || prevAction === 'Sliding Tackle';
 
     if ((prevAction === 'Pass' || prevAction === 'Through Ball') && prevOutcome === 'Intercepted') {
-        // Intercepted pass/through ball → next is Pass Intercept
         nextAction = 'Pass Intercept';
-        nextOutcome = null; // first available
-        nextActionPlayer = null; // tagger must manually select interceptor
-        nextReactionPlayer = prevActionPlayer; // the passer whose ball was intercepted
+        nextOutcome = null;
+        nextActionPlayer = null;
+        nextReactionPlayer = prevActionPlayer;
     } else if (prevAction === 'Shoot' && prevOutcome === 'Save') {
-        // Shot saved → next is Save by goalkeeper
         nextAction = 'Save';
         nextOutcome = null;
-        nextActionPlayer = prevReactionPlayer; // goalkeeper
-        nextReactionPlayer = prevActionPlayer; // shooter
+        nextActionPlayer = prevReactionPlayer;
+        nextReactionPlayer = prevActionPlayer;
     } else if (prevAction === 'Shoot' && prevOutcome === 'Block') {
-        // Shot blocked → next is Block by blocker
         nextAction = 'Block';
         nextOutcome = null;
-        nextActionPlayer = prevReactionPlayer; // blocker
-        nextReactionPlayer = prevActionPlayer; // shooter
+        nextActionPlayer = prevReactionPlayer;
+        nextReactionPlayer = prevActionPlayer;
     } else if (isTackle && prevOutcome === 'Successful' && prevType === 'With Possession') {
-        // Tackle successful with possession → same action player keeps ball
         nextActionPlayer = prevActionPlayer;
     } else if (isTackle && prevOutcome === 'Successful' && prevType === 'Without Possession') {
-        // Tackle successful without possession → no auto-suggestion
         nextActionPlayer = null;
     } else if (isTackle && prevOutcome === 'Unsuccessful') {
-        // Tackle unsuccessful → no auto-suggestion
         nextActionPlayer = null;
     } else {
-        // Default: reaction player becomes next action player (possession flow)
         if (prevReactionPlayer) {
             nextActionPlayer = prevReactionPlayer;
         } else {
@@ -1019,7 +1291,6 @@ async function logEventWithNote(kickoffNote) {
         }
     }
 
-    // Apply next action/outcome/type to dropdowns
     const actionSelect = document.getElementById('action-select');
     actionSelect.value = nextAction;
     actionSelect.dispatchEvent(new Event('change'));
@@ -1037,7 +1308,6 @@ async function logEventWithNote(kickoffNote) {
 
     document.getElementById('body-part-select').value = 'Right Leg';
 
-    // Apply player suggestions
     currentState.actionPlayer = nextActionPlayer;
     currentState.reactionPlayer = nextReactionPlayer;
     updateLineupState();
@@ -1050,7 +1320,10 @@ function getFinalDirection() {
     return currentState.homeDirection === 'L2R' ? 'R2L' : 'L2R';
 }
 
-let syncedEvents = []; // Events already saved to DB
+// ──────────────────────────────────────────
+// STAGING / EVENT LOG
+// ──────────────────────────────────────────
+let syncedEvents = [];
 
 function renderStaging() {
     const body = document.getElementById('staging-body');
@@ -1064,45 +1337,83 @@ function renderStaging() {
         const playerDisplay = e._ui_player || 'Unknown';
         const reactionDisplay = e._ui_reaction_player || '';
 
+        // Make unsynced rows editable
+        const editableClass = isSynced ? '' : 'editable-cell';
+        const editClick = isSynced ? '' : `data-edit-idx="${idx}"`;
+
         return `
             <tr style="border-bottom: 1px solid var(--border); ${bgColor}">
                 <td style="padding: 6px; white-space: nowrap;">${timeStr}</td>
                 <td style="padding: 6px; font-weight: 600;">${e.team_direction}</td>
-                <td style="padding: 6px;"><span style="font-weight:600;">${e.action}</span><br><span style="color:var(--text-muted);font-size:0.65rem;">${e.outcome}</span></td>
-                <td style="padding: 6px;">${e.type || '-'}</td>
-                <td style="padding: 6px;">${e.body_part || '-'}</td>
-                <td style="padding: 6px;">${e.pressure_on ? '🔥 Y' : 'N'}</td>
+                <td style="padding: 6px;" class="${editableClass}" ${editClick} data-edit-field="action">
+                    <span style="font-weight:600;">${e.action}</span><br>
+                    <span style="color:var(--text-muted);font-size:0.65rem;">${e.outcome}</span>
+                </td>
+                <td style="padding: 6px;" class="${editableClass}" ${editClick} data-edit-field="type">${e.type || '-'}</td>
+                <td style="padding: 6px;" class="${editableClass}" ${editClick} data-edit-field="body_part">${e.body_part || '-'}</td>
+                <td style="padding: 6px;">${e.pressure_on ? 'Y' : 'N'}</td>
                 <td style="padding: 6px; white-space: nowrap;">
-                    ⚡ ${playerDisplay}<br>
-                    ${reactionDisplay ? '<span style="color:var(--text-muted);font-size:0.65rem;">🛡 '+reactionDisplay+'</span>' : ''}
+                    ACT: ${playerDisplay}<br>
+                    ${reactionDisplay ? '<span style="color:var(--text-muted);font-size:0.65rem;">DEF: '+reactionDisplay+'</span>' : ''}
                 </td>
                 <td style="padding: 6px; font-family: var(--font-mono); font-size: 0.65rem; white-space: nowrap;">
                     S: ${e.start_x},${e.start_y}<br>
                     E: ${e.end_x !== null ? e.end_x+','+e.end_y : '-'}${e.end_z !== null ? ' (z:'+e.end_z+')' : ''}
                 </td>
-                <td style="padding: 6px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${e.notes || ''}">
+                <td style="padding: 6px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${e.notes || ''}" class="${editableClass}" ${editClick} data-edit-field="notes">
                     ${e.notes || '-'}
                 </td>
                 <td style="padding: 6px; text-align: center;">
                     ${isSynced
-                        ? '<span style="color: var(--success); font-size: 0.7rem;">✔</span>'
-                        : `<button onclick="window.removeStagedEvent(${idx})" style="background: none; border: none; cursor: pointer; filter: grayscale(1);">❌</button>`
+                        ? '<span style="color: var(--success); font-size: 0.7rem;">OK</span>'
+                        : `<button onclick="window.removeStagedEvent(${idx})" style="background: none; border: none; cursor: pointer; color: var(--danger); font-weight: 700; font-size: 0.8rem;">X</button>`
                     }
                 </td>
             </tr>
         `;
     };
 
-    // Combine: unsynced on top (newest first), then synced (newest first)
     const unsyncedRows = localEvents.map((e, idx) => renderRow(e, idx, false)).reverse().join('');
     const syncedRows = syncedEvents.map((e, idx) => renderRow(e, idx, true)).reverse().join('');
     body.innerHTML = unsyncedRows + syncedRows;
 
     window.removeStagedEvent = (idx) => {
-        localEvents.splice(idx, 1);
+        const removed = localEvents.splice(idx, 1)[0];
+        if (removed) undoStack.push(removed);
         saveEventsToStorage();
         renderStaging();
+        updateProgress();
     };
+
+    // Inline editing for unsynced events
+    body.querySelectorAll('[data-edit-idx]').forEach(cell => {
+        cell.addEventListener('dblclick', () => {
+            const idx = parseInt(cell.dataset.editIdx);
+            const field = cell.dataset.editField;
+            if (isNaN(idx) || !field || idx >= localEvents.length) return;
+
+            const currentVal = localEvents[idx][field] || '';
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = currentVal;
+            input.className = 'form-input';
+            input.style.cssText = 'padding: 2px 4px; font-size: 0.7rem; width: 100%;';
+            cell.innerHTML = '';
+            cell.appendChild(input);
+            input.focus();
+
+            const save = () => {
+                localEvents[idx][field] = input.value || null;
+                saveEventsToStorage();
+                renderStaging();
+            };
+            input.addEventListener('blur', save);
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') save();
+                if (e.key === 'Escape') renderStaging();
+            });
+        });
+    });
 }
 
 async function loadSyncedEvents() {
@@ -1125,18 +1436,21 @@ async function loadSyncedEvents() {
         };
     });
     renderStaging();
+    updateProgress();
 }
 
+// ──────────────────────────────────────────
+// SYNC
+// ──────────────────────────────────────────
 async function syncEvents() {
     if (localEvents.length === 0) return;
     const btn = document.getElementById('sync-btn');
+    const syncStatus = document.getElementById('sync-status');
     btn.innerText = 'Syncing...';
     btn.disabled = true;
 
-    // Remove UI helper fields
     const payload = localEvents.map(({ _ui_player, _ui_reaction_player, ...rest }) => rest);
 
-    // Batch insert in chunks of 500 for reliability with large event sets
     const BATCH_SIZE = 500;
     let allSuccess = true;
     let lastError = null;
@@ -1153,7 +1467,7 @@ async function syncEvents() {
                 lastError = error;
                 if (retries > 0) {
                     btn.innerText = `Retrying... (${3 - retries}/3)`;
-                    await new Promise(r => setTimeout(r, 1000)); // Wait 1s before retry
+                    await new Promise(r => setTimeout(r, 1000));
                 }
             } else {
                 success = true;
@@ -1170,17 +1484,20 @@ async function syncEvents() {
 
     if (!allSuccess) {
         alert("Sync Error: " + (lastError?.message || 'Unknown error. Your data is safe in local storage.'));
-        btn.innerText = '⚠ Sync Retry';
+        btn.innerText = 'Sync Retry';
         btn.disabled = false;
+        if (syncStatus) syncStatus.textContent = 'Sync failed — data safe locally';
     } else {
-        // Move synced events to the synced list with their UI labels
         syncedEvents = [...localEvents, ...syncedEvents];
         localEvents = [];
-        saveEventsToStorage(); // Clear localStorage after successful sync
+        undoStack = [];
+        saveEventsToStorage();
         renderStaging();
-        btn.innerText = '☁ Synced';
+        updateProgress();
+        btn.innerText = 'Synced!';
+        if (syncStatus) syncStatus.textContent = `${syncedEvents.length} events synced`;
         setTimeout(() => {
-            btn.innerText = '☁ Sync All';
+            btn.innerText = 'Sync All';
             btn.disabled = false;
         }, 2000);
     }

@@ -7,12 +7,14 @@ import { exportToExcel, exportToCSV } from '../lib/excelExport'
 let allMatches = [];
 let allTeams = [];
 let allPlayers = [];
-let teamStats = {};   // { team_id: { matchCount, playerCount } }
-let playerStats = {}; // { player_id: { eventCount } }
+let allUsers = [];
+let teamStats = {};
+let playerStats = {};
 let mergeTeamSource = null;
 let mergeTeamTarget = null;
 let mergePlayerSource = null;
 let mergePlayerTarget = null;
+let selectedMatchIds = new Set();
 
 /* ──────────────────────────────────────────
    VIEW
@@ -20,7 +22,7 @@ let mergePlayerTarget = null;
 export function AdminPortalView() {
     return `
     <style>
-        .admin-tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 2px solid var(--border); padding-bottom: 0; }
+        .admin-tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 2px solid var(--border); padding-bottom: 0; flex-wrap: wrap; }
         .admin-tab { padding: 10px 20px; border: 1px solid transparent; border-bottom: none; border-radius: var(--radius-md) var(--radius-md) 0 0; background: transparent; cursor: pointer; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); font-family: inherit; transition: all 0.15s; }
         .admin-tab:hover { color: var(--text-main); background: var(--row-hover); }
         .admin-tab.active { color: var(--text-main); background: var(--bg-card); border-color: var(--border); margin-bottom: -2px; border-bottom: 2px solid var(--bg-card); }
@@ -50,6 +52,15 @@ export function AdminPortalView() {
         .dl-btn { background: none; border: 1px solid var(--border); color: var(--text-main); padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.7rem; font-weight: 600; font-family: inherit; transition: all 0.15s; }
         .dl-btn:hover { background: var(--hover-bg); border-color: var(--hover-border); }
         .dl-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .bulk-bar { display: flex; gap: 8px; align-items: center; padding: 10px 16px; background: var(--primary-light); border: 1px solid var(--border); border-radius: var(--radius-md); margin-bottom: 16px; flex-wrap: wrap; }
+        .bulk-bar .bulk-count { font-size: 0.8rem; font-weight: 700; color: var(--accent); }
+
+        .assign-select { padding: 4px 8px; font-size: 0.7rem; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-input); color: var(--text-main); font-family: inherit; }
+
+        @media (max-width: 768px) {
+            .merge-columns { grid-template-columns: 1fr; }
+        }
     </style>
 
     <div class="fade-in">
@@ -68,18 +79,33 @@ export function AdminPortalView() {
         <!-- MATCHES TAB -->
         <section id="admin-tab-matches" class="admin-section visible">
             <div class="card">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
                     <h3 style="margin: 0;">All Matches</h3>
                     <input id="admin-match-search" class="form-input admin-search" style="width: 280px; margin: 0;" type="text" placeholder="Search matches...">
                 </div>
+
+                <!-- Bulk Operations Bar -->
+                <div id="bulk-bar" class="bulk-bar" style="display: none;">
+                    <span class="bulk-count" id="bulk-count">0 selected</span>
+                    <button class="dl-btn" id="bulk-status-doing">Set: Doing</button>
+                    <button class="dl-btn" id="bulk-status-qc">Set: QC</button>
+                    <button class="dl-btn" id="bulk-status-done">Set: Done</button>
+                    <button class="dl-btn" id="bulk-export-xlsx">Export XLSX</button>
+                    <button class="dl-btn" id="bulk-export-csv">Export CSV</button>
+                    <button class="dl-btn" id="bulk-delete" style="color: var(--danger); border-color: var(--danger);">Delete</button>
+                    <button class="dl-btn" id="bulk-clear">Clear Selection</button>
+                </div>
+
                 <div style="overflow-x: auto;">
                     <table class="admin-table">
                         <thead>
                             <tr>
+                                <th style="width: 30px;"><input type="checkbox" id="select-all-matches" title="Select all"></th>
                                 <th>Match</th>
                                 <th>Home</th>
                                 <th>Away</th>
                                 <th>Creator</th>
+                                <th>Assigned To</th>
                                 <th>Date</th>
                                 <th>Status</th>
                                 <th>Events</th>
@@ -88,7 +114,7 @@ export function AdminPortalView() {
                             </tr>
                         </thead>
                         <tbody id="admin-matches-tbody">
-                            <tr><td colspan="9" style="text-align: center; padding: 40px; color: var(--text-muted);">Loading...</td></tr>
+                            <tr><td colspan="11" style="text-align: center; padding: 40px; color: var(--text-muted);">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -194,29 +220,57 @@ export async function initAdminPortal() {
     document.getElementById('btn-merge-teams').addEventListener('click', () => handleMerge('teams'));
     document.getElementById('btn-merge-players').addEventListener('click', () => handleMerge('players'));
 
-    // Download delegation
+    // Download / action delegation
     document.getElementById('admin-matches-tbody').addEventListener('click', handleMatchAction);
+
+    // Select all checkbox
+    document.getElementById('select-all-matches').addEventListener('change', (e) => {
+        const checked = e.target.checked;
+        if (checked) {
+            allMatches.forEach(m => selectedMatchIds.add(m.match_id));
+        } else {
+            selectedMatchIds.clear();
+        }
+        renderMatchRows();
+        updateBulkBar();
+    });
+
+    // Bulk operation buttons
+    document.getElementById('bulk-status-doing').addEventListener('click', () => bulkChangeStatus('Doing'));
+    document.getElementById('bulk-status-qc').addEventListener('click', () => bulkChangeStatus('QC'));
+    document.getElementById('bulk-status-done').addEventListener('click', () => bulkChangeStatus('Done'));
+    document.getElementById('bulk-export-xlsx').addEventListener('click', () => bulkExport('xlsx'));
+    document.getElementById('bulk-export-csv').addEventListener('click', () => bulkExport('csv'));
+    document.getElementById('bulk-delete').addEventListener('click', bulkDelete);
+    document.getElementById('bulk-clear').addEventListener('click', () => {
+        selectedMatchIds.clear();
+        document.getElementById('select-all-matches').checked = false;
+        renderMatchRows();
+        updateBulkBar();
+    });
 }
 
 /* ──────────────────────────────────────────
    MATCHES
    ────────────────────────────────────────── */
 async function fetchAdminMatches() {
-    const [matchRes, countRes] = await Promise.all([
+    const [matchRes, countRes, userRes] = await Promise.all([
         supabase.from('matches').select(`
             *, home_team:teams!home_team_id(team_name),
             away_team:teams!away_team_id(team_name),
             creator:profiles!created_by(username)
         `).order('created_at', { ascending: false }),
         supabase.from('match_events').select('match_id'),
+        supabase.from('profiles').select('id, username, role'),
     ]);
 
     if (matchRes.error) {
-        document.getElementById('admin-matches-tbody').innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 40px; color: var(--danger);">${matchRes.error.message}</td></tr>`;
+        document.getElementById('admin-matches-tbody').innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 40px; color: var(--danger);">${matchRes.error.message}</td></tr>`;
         return;
     }
 
-    // Count events per match
+    allUsers = userRes.data || [];
+
     const eventCounts = {};
     (countRes.data || []).forEach(e => { eventCounts[e.match_id] = (eventCounts[e.match_id] || 0) + 1; });
 
@@ -243,19 +297,33 @@ function renderMatchRows() {
     ) : allMatches;
 
     if (!filtered.length) {
-        tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 40px; color: var(--text-muted);">${q ? 'No matches found.' : 'No matches in the system.'}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 40px; color: var(--text-muted);">${q ? 'No matches found.' : 'No matches in the system.'}</td></tr>`;
         return;
     }
 
+    // Build assign-to dropdown options
+    const userOptions = allUsers.map(u => `<option value="${u.id}">${u.username || 'Unnamed'}</option>`).join('');
+
     tbody.innerHTML = filtered.map(m => {
         const sc = statusStyle(m.status);
-        const date = m.match_date ? new Date(m.match_date).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '—';
+        const date = m.match_date ? new Date(m.match_date).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '-';
+        const isChecked = selectedMatchIds.has(m.match_id) ? 'checked' : '';
+        const assignedUser = allUsers.find(u => u.id === m.assigned_to);
+        const assignedName = assignedUser?.username || '-';
+
         return `
         <tr>
+            <td><input type="checkbox" class="match-checkbox" data-match-id="${m.match_id}" ${isChecked}></td>
             <td><strong>${m.match_name}</strong></td>
             <td>${m.homeName}</td>
             <td>${m.awayName}</td>
             <td>${m.creatorName}</td>
+            <td>
+                <select class="assign-select" data-assign-match="${m.match_id}">
+                    <option value="">Unassigned</option>
+                    ${userOptions}
+                </select>
+            </td>
             <td style="white-space: nowrap;">${date}</td>
             <td><span class="admin-status" style="background: ${sc.bg}; color: ${sc.color};">${m.status}</span></td>
             <td style="text-align: center;">${m.eventCount}</td>
@@ -266,12 +334,111 @@ function renderMatchRows() {
             </td>
         </tr>`;
     }).join('');
+
+    // Checkbox event delegation
+    tbody.querySelectorAll('.match-checkbox').forEach(cb => {
+        cb.addEventListener('change', (e) => {
+            const matchId = e.target.dataset.matchId;
+            if (e.target.checked) {
+                selectedMatchIds.add(matchId);
+            } else {
+                selectedMatchIds.delete(matchId);
+            }
+            updateBulkBar();
+        });
+    });
+
+    // Assign-to dropdowns
+    tbody.querySelectorAll('.assign-select').forEach(sel => {
+        // Set current value
+        const matchId = sel.dataset.assignMatch;
+        const match = allMatches.find(m => m.match_id === matchId);
+        if (match?.assigned_to) sel.value = match.assigned_to;
+
+        sel.addEventListener('change', async (e) => {
+            const newAssignee = e.target.value || null;
+            const { error } = await supabase.from('matches').update({ assigned_to: newAssignee }).eq('match_id', matchId);
+            if (error) {
+                alert('Failed to assign: ' + error.message);
+            }
+        });
+    });
+}
+
+function updateBulkBar() {
+    const bar = document.getElementById('bulk-bar');
+    const count = document.getElementById('bulk-count');
+    if (selectedMatchIds.size > 0) {
+        bar.style.display = 'flex';
+        count.textContent = `${selectedMatchIds.size} selected`;
+    } else {
+        bar.style.display = 'none';
+    }
 }
 
 function statusStyle(status) {
     if (status === 'Done') return { bg: 'var(--success)', color: 'white' };
     if (status === 'QC') return { bg: 'var(--warning)', color: 'black' };
     return { bg: 'var(--accent)', color: 'white' };
+}
+
+/* ──────────────────────────────────────────
+   BULK OPERATIONS
+   ────────────────────────────────────────── */
+async function bulkChangeStatus(newStatus) {
+    if (selectedMatchIds.size === 0) return;
+    if (!confirm(`Change ${selectedMatchIds.size} matches to "${newStatus}"?`)) return;
+
+    const ids = [...selectedMatchIds];
+    const { error } = await supabase.from('matches').update({ status: newStatus }).in('match_id', ids);
+    if (error) {
+        alert('Bulk status change failed: ' + error.message);
+    } else {
+        selectedMatchIds.clear();
+        document.getElementById('select-all-matches').checked = false;
+        await fetchAdminMatches();
+        updateBulkBar();
+    }
+}
+
+async function bulkExport(format) {
+    if (selectedMatchIds.size === 0) return;
+    const ids = [...selectedMatchIds];
+
+    for (const id of ids) {
+        const match = allMatches.find(m => m.match_id === id);
+        if (!match) continue;
+        try {
+            const enriched = await fetchEnrichedEvents(id);
+            if (!enriched || !enriched.length) continue;
+            const filename = `Bulk_${match.match_name.replace(/\s+/g, '_')}`;
+            if (format === 'xlsx') exportToExcel(enriched, filename);
+            else exportToCSV(enriched, filename);
+        } catch (err) {
+            console.error(`Export failed for ${id}:`, err);
+        }
+    }
+}
+
+async function bulkDelete() {
+    if (selectedMatchIds.size === 0) return;
+    if (!confirm(`PERMANENTLY DELETE ${selectedMatchIds.size} matches and all their events? This cannot be undone!`)) return;
+    if (!confirm(`Are you REALLY sure? Type the number of matches to confirm.`)) return;
+
+    const ids = [...selectedMatchIds];
+    for (const id of ids) {
+        // Delete events first, then lineups, then match
+        await supabase.from('match_events').delete().eq('match_id', id);
+        await supabase.from('processed_match_events').delete().eq('match_id', id);
+        await supabase.from('lineups').delete().eq('match_id', id);
+        await supabase.from('matches').delete().eq('match_id', id);
+    }
+
+    selectedMatchIds.clear();
+    document.getElementById('select-all-matches').checked = false;
+    await fetchAdminMatches();
+    updateBulkBar();
+    alert(`${ids.length} matches deleted.`);
 }
 
 /* ──────────────────────────────────────────
@@ -305,7 +472,6 @@ async function handleMatchAction(e) {
 }
 
 async function fetchEnrichedEvents(matchId) {
-    // Step 1: Fetch processed events + match team IDs in parallel
     const [evRes, mdRes] = await Promise.all([
         supabase.from('processed_match_events').select('*').eq('match_id', matchId).order('match_time_seconds'),
         supabase.from('matches').select('home_team_id, away_team_id').eq('match_id', matchId).single(),
@@ -315,13 +481,11 @@ async function fetchEnrichedEvents(matchId) {
     if (!events || !events.length) return null;
     if (!mdRes.data) return events;
 
-    // Step 2: Fetch players + lineups
     const [plRes, luRes] = await Promise.all([
         supabase.from('players').select('player_id, player_name, team_id, teams(team_name)').in('team_id', [mdRes.data.home_team_id, mdRes.data.away_team_id]),
         supabase.from('lineups').select('player_id, jersey_no').eq('match_id', matchId),
     ]);
 
-    // Build lookup map
     const playerMap = {};
     (plRes.data || []).forEach(p => {
         const lu = (luRes.data || []).find(l => l.player_id === p.player_id);
@@ -332,7 +496,6 @@ async function fetchEnrichedEvents(matchId) {
         };
     });
 
-    // Step 3: Enrich
     return events.map(e => ({
         ...e,
         act_player_name: playerMap[e.player_id]?.player_name || '',
@@ -377,7 +540,6 @@ async function fetchAdminUsers() {
         </tr>
     `).join('');
 
-    // Event delegation for role toggle
     tbody.addEventListener('click', async (e) => {
         const btn = e.target.closest('[data-toggle-role]');
         if (!btn) return;
@@ -407,8 +569,6 @@ async function fetchTeamMergeData() {
     ]);
 
     allTeams = teamRes.data || [];
-
-    // Count matches and players per team
     teamStats = {};
     allTeams.forEach(t => { teamStats[t.team_id] = { matchCount: 0, playerCount: 0 }; });
     (matchRes.data || []).forEach(m => {
@@ -442,7 +602,6 @@ function renderTeamMergeLists() {
     sourceList.innerHTML = buildItems(mergeTeamSource, 'source') || '<div style="padding: 20px; text-align: center; color: var(--text-muted);">No teams found</div>';
     targetList.innerHTML = buildItems(mergeTeamTarget, 'target') || '<div style="padding: 20px; text-align: center; color: var(--text-muted);">No teams found</div>';
 
-    // Click handlers
     sourceList.onclick = (e) => {
         const item = e.target.closest('[data-id]');
         if (!item) return;
@@ -491,7 +650,6 @@ async function fetchPlayerMergeData() {
         team_name: p.teams?.team_name || 'No Team',
     }));
 
-    // Count events per player (both action and reaction)
     playerStats = {};
     (eventRes.data || []).forEach(e => {
         if (e.player_id) playerStats[e.player_id] = (playerStats[e.player_id] || 0) + 1;
@@ -577,7 +735,6 @@ async function handleMerge(type) {
         alert('Merge successful!');
         if (isTeam) await fetchTeamMergeData();
         else await fetchPlayerMergeData();
-        // Also refresh matches since team names may have changed
         await fetchAdminMatches();
     }
 }

@@ -19,6 +19,8 @@ class App {
         this.appElement = document.getElementById('app');
         this.user = null;
         this.userRole = null;
+        this._sessionWarningTimer = null;
+        this._sessionExpireTimer = null;
 
         // Global error handling
         window.addEventListener('error', (e) => this.showFatalError(e.message));
@@ -49,11 +51,60 @@ class App {
             if (_event === 'PASSWORD_RECOVERY') {
                 window.location.hash = '#reset-password';
             }
+            if (_event === 'TOKEN_REFRESHED' || _event === 'SIGNED_IN') {
+                this.resetSessionTimers();
+            }
             await this.handleAuthChange(session?.user ?? null);
         });
 
         window.addEventListener('hashchange', () => this.render());
         this.render();
+    }
+
+    // ── Session Timeout Warning ──────────────────────────────
+    resetSessionTimers() {
+        clearTimeout(this._sessionWarningTimer);
+        clearTimeout(this._sessionExpireTimer);
+        this.dismissSessionWarning();
+
+        if (!this.user) return;
+
+        // Supabase default session = 1 hour. Warn at 55 min, expire at 60 min.
+        this._sessionWarningTimer = setTimeout(() => {
+            this.showSessionWarning();
+        }, 55 * 60 * 1000); // 55 minutes
+
+        this._sessionExpireTimer = setTimeout(() => {
+            this.dismissSessionWarning();
+            alert('Your session has expired. Please log in again.');
+            supabase.auth.signOut();
+        }, 60 * 60 * 1000); // 60 minutes
+    }
+
+    showSessionWarning() {
+        // Don't duplicate
+        if (document.getElementById('session-warning-bar')) return;
+        const bar = document.createElement('div');
+        bar.id = 'session-warning-bar';
+        bar.className = 'session-warning-bar';
+        bar.innerHTML = `
+            <span>Your session expires in ~5 minutes. Save your work!</span>
+            <button id="session-refresh-btn" style="margin-left:12px;padding:4px 12px;border-radius:4px;border:1px solid rgba(255,255,255,0.5);background:transparent;color:white;cursor:pointer;font-family:inherit;font-weight:700;">Refresh Session</button>
+            <button id="session-dismiss-btn" style="margin-left:8px;background:none;border:none;color:rgba(255,255,255,0.7);cursor:pointer;font-size:1.1rem;">✕</button>
+        `;
+        document.body.prepend(bar);
+        document.getElementById('session-refresh-btn')?.addEventListener('click', async () => {
+            const { error } = await supabase.auth.refreshSession();
+            if (!error) {
+                this.resetSessionTimers();
+                this.dismissSessionWarning();
+            }
+        });
+        document.getElementById('session-dismiss-btn')?.addEventListener('click', () => this.dismissSessionWarning());
+    }
+
+    dismissSessionWarning() {
+        document.getElementById('session-warning-bar')?.remove();
     }
 
     async handleAuthChange(user) {
@@ -72,6 +123,10 @@ class App {
             } catch (e) {
                 this.userRole = 'analyst';
             }
+            this.resetSessionTimers();
+        } else {
+            clearTimeout(this._sessionWarningTimer);
+            clearTimeout(this._sessionExpireTimer);
         }
 
         const publicRoutes = ['#login', '#register', '#forgot-password', '#reset-password'];
@@ -115,6 +170,10 @@ class App {
             const roleName = esc(this.userRole || 'Analyst');
 
             this.appElement.innerHTML = `
+                <!-- Offline Banner -->
+                <div id="offline-banner" class="offline-banner" style="display: none;">
+                    <span id="offline-text">You are offline — events saved locally</span>
+                </div>
                 <div class="app-container">
                     <aside class="sidebar">
                         <div class="sidebar-brand">
@@ -122,22 +181,25 @@ class App {
                         </div>
                         <nav class="nav-list">
                             <a href="#create-match" class="nav-item ${hash === '#create-match' ? 'active' : ''}">
-                                <span>➕</span> Create Match
+                                <span>+</span> Create Match
                             </a>
                             <a href="#matches" class="nav-item ${hash === '#matches' ? 'active' : ''}">
-                                <span>📋</span> My Matches
+                                <span>@</span> My Matches
                             </a>
                             <a href="#qc" class="nav-item ${hash === '#qc' ? 'active' : ''}">
-                                <span>✅</span> QC Portal
+                                <span>~</span> QC Portal
+                            </a>
+                            <a href="#analytics" class="nav-item ${hash === '#analytics' ? 'active' : ''}">
+                                <span>#</span> Analytics
                             </a>
                             ${this.userRole === 'admin' ? `
                             <a href="#admin" class="nav-item ${hash.startsWith('#admin') ? 'active' : ''}">
-                                <span>⚙️</span> Admin Portal
+                                <span>*</span> Admin Portal
                             </a>` : ''}
                         </nav>
                         <div class="sidebar-footer">
                             <div class="theme-toggle">
-                                <span id="theme-label">${document.documentElement.getAttribute('data-theme') === 'dark' ? '🌙 Dark' : '☀️ Light'}</span>
+                                <span id="theme-label">${document.documentElement.getAttribute('data-theme') === 'dark' ? 'Dark' : 'Light'}</span>
                                 <label class="theme-switch">
                                     <input type="checkbox" id="theme-checkbox" ${document.documentElement.getAttribute('data-theme') === 'dark' ? 'checked' : ''}>
                                     <span class="theme-slider"></span>
@@ -151,7 +213,7 @@ class App {
                                 </div>
                             </div>
                             <button class="btn btn-ghost" id="logout-btn">
-                                <span>🚪</span> Logout
+                                Logout
                             </button>
                         </div>
                     </aside>
@@ -175,12 +237,37 @@ class App {
                     document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
                     localStorage.setItem('cac-theme', isDark ? 'dark' : 'light');
                     const label = document.getElementById('theme-label');
-                    if (label) label.textContent = isDark ? '🌙 Dark' : '☀️ Light';
+                    if (label) label.textContent = isDark ? 'Dark' : 'Light';
                 });
             }
+
+            // Offline/Online detection
+            this.setupOfflineDetection();
         }
 
         if (route.onRender) route.onRender();
+    }
+
+    setupOfflineDetection() {
+        const banner = document.getElementById('offline-banner');
+        if (!banner) return;
+
+        const updateBanner = () => {
+            if (!navigator.onLine) {
+                banner.style.display = 'flex';
+                document.getElementById('offline-text').textContent = 'You are offline — events saved locally';
+            } else {
+                banner.style.display = 'none';
+            }
+        };
+
+        window.addEventListener('online', () => {
+            banner.style.display = 'none';
+            // Dispatch custom event so tagger can auto-sync
+            window.dispatchEvent(new CustomEvent('cac-online'));
+        });
+        window.addEventListener('offline', updateBanner);
+        updateBanner();
     }
 }
 

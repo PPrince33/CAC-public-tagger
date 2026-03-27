@@ -815,6 +815,20 @@ export async function initTagger() {
             Object.keys(CAC_LOGIC[savedSession.action]).forEach(out => outcomeSelect.add(new Option(out, out)));
             document.getElementById('goal-face-overlay').style.display = savedSession.action === 'Shoot' ? 'flex' : 'none';
             document.getElementById('shot-metadata-overlay').style.display = savedSession.action === 'Shoot' ? 'flex' : 'none';
+
+            // Enforce end point / reaction player rules for the restored action
+            const rule = ACTION_RULES[savedSession.action];
+            if (rule) {
+                pitch.allowEndPoint = rule.end_point;
+                if (!rule.end_point && pitch.endPoint) {
+                    pitch.endPoint = null;
+                    pitch.draw();
+                    document.getElementById('pitch-coords').innerText = `Start: ${pitch.startPoint ? pitch.startPoint.x+','+pitch.startPoint.y : 'None'} | End: None`;
+                }
+                if (rule.reaction === "None" && currentState.reactionPlayer) {
+                    currentState.reactionPlayer = null;
+                }
+            }
         }
         if (savedSession.outcome && outcomeSelect.querySelector(`option[value="${savedSession.outcome}"]`)) {
             outcomeSelect.value = savedSession.outcome;
@@ -1018,6 +1032,10 @@ function renderPlayerGrids() {
                 currentState.actionPlayer = { id: playerId, teamId, name, jersey };
             }
         } else {
+            const actionVal = document.getElementById('action-select').value;
+            const rule = ACTION_RULES[actionVal];
+            if (rule && rule.reaction === "None") return;
+
             if (currentState.reactionPlayer?.id === playerId) {
                 currentState.reactionPlayer = null;
             } else {

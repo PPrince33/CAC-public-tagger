@@ -1170,7 +1170,7 @@ async function logEventWithNote(kickoffNote) {
     if (!rule.end_point && pitch.endPoint) {
         pitch.endPoint = null;
     }
-    if (currentState.reactionPlayer && currentState.actionPlayer.id === currentState.reactionPlayer.id) {
+    if (currentState.reactionPlayer && currentState.actionPlayer && currentState.actionPlayer.id === currentState.reactionPlayer.id) {
         alert("Action Player and Reaction Player cannot be the same.");
         currentState.reactionPlayer = null;
         updateLineupState();

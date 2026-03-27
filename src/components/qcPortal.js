@@ -912,9 +912,16 @@ async function executeProcessing() {
 async function handleExportExcel() {
     if (!activeMatch) return;
     try {
-        const { data, error } = await supabase.from('processed_match_events').select('*').eq('match_id', activeMatch.match_id).order('match_time_seconds', { ascending: true });
-        if (error) throw error;
-        if (!data?.length) return showPopup('No processed data. Run Process & Finalize first.', 'Error');
+        // Paginated fetch — Supabase limits to 1000 rows per request
+        let data = [], rangeStart = 0;
+        while (true) {
+            const { data: page, error: pgErr } = await supabase.from('processed_match_events').select('*').eq('match_id', activeMatch.match_id).order('match_time_seconds', { ascending: true }).range(rangeStart, rangeStart + 999);
+            if (pgErr) throw pgErr;
+            data = data.concat(page || []);
+            if (!page || page.length < 1000) break;
+            rangeStart += 1000;
+        }
+        if (!data.length) return showPopup('No processed data. Run Process & Finalize first.', 'Error');
 
         // Ensure we have player data loaded
         if (!matchPlayers.length) await fetchPlayersForMatch(activeMatch.match_id);

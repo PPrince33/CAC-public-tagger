@@ -87,36 +87,42 @@ export async function initAnalytics() {
         const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
         const isAdmin = profile?.role === 'admin';
 
-        // Build role-aware queries
-        let matchQuery, eventQuery, profileQuery;
-
-        if (isAdmin) {
-            // Admin sees everything
-            matchQuery = supabase.from('matches').select('match_id, created_by, created_at, status');
-            eventQuery = supabase.from('match_events').select('event_id, match_id, analyst_id, action, created_at');
-            profileQuery = supabase.from('profiles').select('id, username, role');
-        } else {
-            // Analyst sees only their own matches and events
-            matchQuery = supabase.from('matches')
-                .select('match_id, created_by, created_at, status, assigned_to')
-                .or(`created_by.eq.${user.id},assigned_to.eq.${user.id}`);
-            eventQuery = supabase.from('match_events')
-                .select('event_id, match_id, analyst_id, action, created_at')
-                .eq('analyst_id', user.id);
-            profileQuery = supabase.from('profiles')
-                .select('id, username, role')
-                .eq('id', user.id);
+        // Paginated fetch helper — Supabase limits to 1000 rows per request
+        async function fetchAll(query) {
+            let all = [], rangeStart = 0;
+            while (true) {
+                const { data, error } = await query.range(rangeStart, rangeStart + 999);
+                if (error) throw error;
+                all = all.concat(data || []);
+                if (!data || data.length < 1000) break;
+                rangeStart += 1000;
+            }
+            return all;
         }
 
-        const [matchRes, eventRes, profileRes] = await Promise.all([
-            matchQuery,
-            eventQuery,
-            profileQuery,
-        ]);
+        let matches, events, profiles;
 
-        const matches = matchRes.data || [];
-        const events = eventRes.data || [];
-        const profiles = profileRes.data || [];
+        if (isAdmin) {
+            // Admin sees everything — paginated
+            [matches, events, profiles] = await Promise.all([
+                fetchAll(supabase.from('matches').select('match_id, created_by, created_at, status')),
+                fetchAll(supabase.from('match_events').select('event_id, match_id, analyst_id, action, created_at')),
+                fetchAll(supabase.from('profiles').select('id, username, role')),
+            ]);
+        } else {
+            // Analyst sees only their own matches and events — paginated
+            [matches, events, profiles] = await Promise.all([
+                fetchAll(supabase.from('matches')
+                    .select('match_id, created_by, created_at, status, assigned_to')
+                    .or(`created_by.eq.${user.id},assigned_to.eq.${user.id}`)),
+                fetchAll(supabase.from('match_events')
+                    .select('event_id, match_id, analyst_id, action, created_at')
+                    .eq('analyst_id', user.id)),
+                fetchAll(supabase.from('profiles')
+                    .select('id, username, role')
+                    .eq('id', user.id)),
+            ]);
+        }
 
         // Summary stats
         const totalMatches = matches.length;

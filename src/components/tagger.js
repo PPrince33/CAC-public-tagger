@@ -1418,15 +1418,27 @@ function renderStaging() {
 
 async function loadSyncedEvents() {
     if (!activeMatch) return;
-    const { data, error } = await supabase
-        .from('match_events')
-        .select('*, player:players!player_id(player_name), reaction:players!reaction_player_id(player_name)')
-        .eq('match_id', activeMatch.match_id)
-        .order('match_time_seconds', { ascending: true });
 
-    if (error) { console.error('Failed to load synced events:', error); return; }
+    // Paginated fetch — Supabase limits to 1000 rows per request
+    let allData = [];
+    let rangeStart = 0;
+    const PAGE_SIZE = 1000;
 
-    syncedEvents = (data || []).map(e => {
+    while (true) {
+        const { data, error } = await supabase
+            .from('match_events')
+            .select('*, player:players!player_id(player_name), reaction:players!reaction_player_id(player_name)')
+            .eq('match_id', activeMatch.match_id)
+            .order('match_time_seconds', { ascending: true })
+            .range(rangeStart, rangeStart + PAGE_SIZE - 1);
+
+        if (error) { console.error('Failed to load synced events:', error); return; }
+        allData = allData.concat(data || []);
+        if (!data || data.length < PAGE_SIZE) break;
+        rangeStart += PAGE_SIZE;
+    }
+
+    syncedEvents = allData.map(e => {
         const pLineup = activeLineup.find(l => l.player_id === e.player_id);
         const rLineup = activeLineup.find(l => l.player_id === e.reaction_player_id);
         return {

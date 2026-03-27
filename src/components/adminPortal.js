@@ -254,13 +254,12 @@ export async function initAdminPortal() {
    MATCHES
    ────────────────────────────────────────── */
 async function fetchAdminMatches() {
-    const [matchRes, countRes, userRes] = await Promise.all([
+    const [matchRes, userRes] = await Promise.all([
         supabase.from('matches').select(`
             *, home_team:teams!home_team_id(team_name),
             away_team:teams!away_team_id(team_name),
             creator:profiles!created_by(username)
         `).order('created_at', { ascending: false }),
-        supabase.from('match_events').select('match_id'),
         supabase.from('profiles').select('id, username, role'),
     ]);
 
@@ -271,8 +270,17 @@ async function fetchAdminMatches() {
 
     allUsers = userRes.data || [];
 
+    // Paginated fetch for event counts — Supabase limits to 1000 rows
+    let allEventRows = [], rangeStart = 0;
+    while (true) {
+        const { data: page } = await supabase.from('match_events').select('match_id').range(rangeStart, rangeStart + 999);
+        allEventRows = allEventRows.concat(page || []);
+        if (!page || page.length < 1000) break;
+        rangeStart += 1000;
+    }
+
     const eventCounts = {};
-    (countRes.data || []).forEach(e => { eventCounts[e.match_id] = (eventCounts[e.match_id] || 0) + 1; });
+    allEventRows.forEach(e => { eventCounts[e.match_id] = (eventCounts[e.match_id] || 0) + 1; });
 
     allMatches = (matchRes.data || []).map(m => ({
         ...m,
@@ -472,17 +480,23 @@ async function handleMatchAction(e) {
 }
 
 async function fetchEnrichedEvents(matchId) {
-    const [evRes, mdRes] = await Promise.all([
-        supabase.from('processed_match_events').select('*').eq('match_id', matchId).order('match_time_seconds'),
-        supabase.from('matches').select('home_team_id, away_team_id').eq('match_id', matchId).single(),
-    ]);
+    // Paginated fetch for processed events — Supabase limits to 1000 rows
+    let events = [], rangeStart = 0;
+    while (true) {
+        const { data: page, error } = await supabase.from('processed_match_events').select('*').eq('match_id', matchId).order('match_time_seconds').range(rangeStart, rangeStart + 999);
+        if (error) throw error;
+        events = events.concat(page || []);
+        if (!page || page.length < 1000) break;
+        rangeStart += 1000;
+    }
 
-    const events = evRes.data;
-    if (!events || !events.length) return null;
-    if (!mdRes.data) return events;
+    const { data: mdData } = await supabase.from('matches').select('home_team_id, away_team_id').eq('match_id', matchId).single();
+
+    if (!events.length) return null;
+    if (!mdData) return events;
 
     const [plRes, luRes] = await Promise.all([
-        supabase.from('players').select('player_id, player_name, team_id, teams(team_name)').in('team_id', [mdRes.data.home_team_id, mdRes.data.away_team_id]),
+        supabase.from('players').select('player_id, player_name, team_id, teams(team_name)').in('team_id', [mdData.home_team_id, mdData.away_team_id]),
         supabase.from('lineups').select('player_id, jersey_no').eq('match_id', matchId),
     ]);
 
@@ -639,10 +653,7 @@ function updateTeamMergeSummary() {
    PLAYER MERGE
    ────────────────────────────────────────── */
 async function fetchPlayerMergeData() {
-    const [playerRes, eventRes] = await Promise.all([
-        supabase.from('players').select('player_id, player_name, team_id, teams(team_name)').order('player_name'),
-        supabase.from('match_events').select('player_id, reaction_player_id'),
-    ]);
+    const playerRes = await supabase.from('players').select('player_id, player_name, team_id, teams(team_name)').order('player_name');
 
     allPlayers = (playerRes.data || []).map(p => ({
         player_id: p.player_id,
@@ -650,8 +661,17 @@ async function fetchPlayerMergeData() {
         team_name: p.teams?.team_name || 'No Team',
     }));
 
+    // Paginated fetch — Supabase limits to 1000 rows
+    let allEventRows = [], rangeStart = 0;
+    while (true) {
+        const { data: page } = await supabase.from('match_events').select('player_id, reaction_player_id').range(rangeStart, rangeStart + 999);
+        allEventRows = allEventRows.concat(page || []);
+        if (!page || page.length < 1000) break;
+        rangeStart += 1000;
+    }
+
     playerStats = {};
-    (eventRes.data || []).forEach(e => {
+    allEventRows.forEach(e => {
         if (e.player_id) playerStats[e.player_id] = (playerStats[e.player_id] || 0) + 1;
         if (e.reaction_player_id) playerStats[e.reaction_player_id] = (playerStats[e.reaction_player_id] || 0) + 1;
     });

@@ -29,6 +29,10 @@ function buildExportRows(data) {
 }
 
 export function exportToExcel(data, filename) {
+    if (!data || data.length === 0) {
+        alert('No data to export.');
+        return;
+    }
     const rows = buildExportRows(data);
     const worksheet = XLSX.utils.json_to_sheet(rows);
     const workbook = XLSX.utils.book_new();
@@ -41,6 +45,10 @@ export function exportToExcel(data, filename) {
 }
 
 export function exportToCSV(data, filename) {
+    if (!data || data.length === 0) {
+        alert('No data to export.');
+        return;
+    }
     let url = null;
     try {
         const rows = buildExportRows(data);

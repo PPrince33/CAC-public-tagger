@@ -166,6 +166,7 @@ function renderDailyChart(events) {
     const canvas = document.getElementById('daily-chart');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
+    if (!ctx) return;
     const W = canvas.width;
     const H = canvas.height;
 
@@ -243,6 +244,7 @@ function renderActionChart(events) {
     const canvas = document.getElementById('action-chart');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
+    if (!ctx) return;
     const W = canvas.width;
     const H = canvas.height;
 

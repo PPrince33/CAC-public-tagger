@@ -39,17 +39,26 @@ function timeToSeconds(timeStr) {
 }
 
 function showPopup(msg, title = 'Notification') {
-    document.getElementById('qc-popup-title').innerText = title;
-    document.getElementById('qc-popup-message').innerText = msg;
-    document.getElementById('qc-popup-modal').style.display = 'flex';
+    const titleEl = document.getElementById('qc-popup-title');
+    const msgEl = document.getElementById('qc-popup-message');
+    const modalEl = document.getElementById('qc-popup-modal');
+    if (!titleEl || !msgEl || !modalEl) return;
+    titleEl.innerText = title;
+    msgEl.innerText = msg;
+    modalEl.style.display = 'flex';
 }
 
 function showConfirm(msg, title, onConfirm) {
-    document.getElementById('qc-confirm-title').innerText = title || 'Confirm Action';
-    document.getElementById('qc-confirm-message').innerText = msg;
-    document.getElementById('qc-confirm-modal').style.display = 'flex';
-    document.getElementById('qc-confirm-yes-btn').onclick = () => {
-        document.getElementById('qc-confirm-modal').style.display = 'none';
+    const titleEl = document.getElementById('qc-confirm-title');
+    const msgEl = document.getElementById('qc-confirm-message');
+    const modalEl = document.getElementById('qc-confirm-modal');
+    const yesBtn = document.getElementById('qc-confirm-yes-btn');
+    if (!titleEl || !msgEl || !modalEl || !yesBtn) return;
+    titleEl.innerText = title || 'Confirm Action';
+    msgEl.innerText = msg;
+    modalEl.style.display = 'flex';
+    yesBtn.onclick = () => {
+        modalEl.style.display = 'none';
         if (onConfirm) onConfirm();
     };
 }
@@ -534,7 +543,11 @@ function drawGoalFace(eventObj) {
     for (let i = 1; i < 5; i++) { ctx.beginPath(); ctx.moveTo(gsx(yC - gw / 2), gsy((gh / 5) * i)); ctx.lineTo(gsx(yC + gw / 2), gsy((gh / 5) * i)); ctx.stroke(); }
 
     if (eventObj?.End_Y != null && eventObj?.End_Z != null) {
-        const sx = gsx(parseFloat(eventObj.End_Y)), sy = gsy(parseFloat(eventObj.End_Z));
+        const endY = parseFloat(eventObj.End_Y);
+        const endZ = parseFloat(eventObj.End_Z);
+        if (isNaN(endY) || isNaN(endZ)) return;
+        const sx = gsx(endY), sy = gsy(endZ);
+        if (!isFinite(sx) || !isFinite(sy)) return;
         const isGoal = eventObj.Action_Outcome === 'Goal', isSave = eventObj.Action_Outcome === 'Save';
         ctx.fillStyle = isGoal ? 'var(--success)' : (isSave ? 'var(--accent)' : 'var(--danger)');
         // Can't use CSS vars in canvas, use raw colors

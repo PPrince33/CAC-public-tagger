@@ -173,7 +173,7 @@ export class VideoEngine {
             this.ptzOverlay.style.cursor = 'grabbing';
         });
 
-        const handleMouseMove = (e) => {
+        this._ptzMouseMove = (e) => {
             if (this.ptz.active) {
                 this.ptz.x = e.clientX - this.ptz.startX;
                 this.ptz.y = e.clientY - this.ptz.startY;
@@ -181,13 +181,32 @@ export class VideoEngine {
             }
         };
 
-        const handleMouseUp = () => {
+        this._ptzMouseUp = () => {
             this.ptz.active = false;
             if (this.ptzOverlay) this.ptzOverlay.style.cursor = 'grab';
         };
 
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
+        document.addEventListener('mousemove', this._ptzMouseMove);
+        document.addEventListener('mouseup', this._ptzMouseUp);
+    }
+
+    cleanup() {
+        if (this._ptzMouseMove) {
+            document.removeEventListener('mousemove', this._ptzMouseMove);
+        }
+        if (this._ptzMouseUp) {
+            document.removeEventListener('mouseup', this._ptzMouseUp);
+        }
+        if (this._onDragMove) {
+            document.removeEventListener('mousemove', this._onDragMove);
+        }
+        if (this._onDragEnd) {
+            document.removeEventListener('mouseup', this._onDragEnd);
+        }
+        if (this.extWindow) {
+            try { this.extWindow.close(); } catch(e) {}
+            this.extWindow = null;
+        }
     }
 
     // ==========================================

@@ -593,6 +593,13 @@ export async function initTagger() {
     document.removeEventListener('keydown', handleHotkeys);
     document.addEventListener('keydown', handleHotkeys);
 
+    // Clean up hotkey listener when navigating away from tagger
+    const cleanupOnNav = () => {
+        document.removeEventListener('keydown', handleHotkeys);
+        window.removeEventListener('hashchange', cleanupOnNav);
+    };
+    window.addEventListener('hashchange', cleanupOnNav);
+
     // Re-render local events IMMEDIATELY so they don't vanish while fetching
     renderStaging();
     const { data: match, error } = await supabase
@@ -1058,7 +1065,7 @@ function updateLineupState() {
 // HOTKEYS
 // ──────────────────────────────────────────
 function handleHotkeys(e) {
-    if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+    if (!document.activeElement || ['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
 
     const key = e.key.toLowerCase();
     const actionSelect = document.getElementById('action-select');
@@ -1204,7 +1211,7 @@ async function logEventWithNote(kickoffNote) {
     const event = {
         match_id: activeMatch.match_id,
         analyst_id: user.id,
-        match_time_seconds: Math.floor(video.getCurrentTime()),
+        match_time_seconds: Math.floor(video?.getCurrentTime?.() || 0),
         start_x: pitch.startPoint.x,
         start_y: pitch.startPoint.y,
         end_x: pitch.endPoint ? pitch.endPoint.x : null,

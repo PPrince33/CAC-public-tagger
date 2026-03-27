@@ -991,6 +991,7 @@ function renderPlayerGrids() {
             btn.title = `${p.players.player_name} (${p.players.position})`;
             btn.textContent = p.jersey_no;
             btn.addEventListener('click', () => {
+                if (btn.classList.contains('disabled')) return;
                 window.taggerSelectPlayer(p.player_id, p.team_id, p.players.player_name, p.jersey_no);
             });
             gridEl.appendChild(btn);
@@ -1006,6 +1007,7 @@ function renderPlayerGrids() {
             btn.title = `${p.players.player_name} (${p.players.position})`;
             btn.textContent = p.jersey_no;
             btn.addEventListener('click', () => {
+                if (btn.classList.contains('disabled')) return;
                 window.taggerSelectPlayer(p.player_id, p.team_id, p.players.player_name, p.jersey_no);
                 document.getElementById('player-dial').style.display = 'none';
             });
@@ -1032,6 +1034,8 @@ function renderPlayerGrids() {
                 currentState.actionPlayer = { id: playerId, teamId, name, jersey };
             }
         } else {
+            if (currentState.actionPlayer && playerId === currentState.actionPlayer.id) return;
+
             const actionVal = document.getElementById('action-select').value;
             const rule = ACTION_RULES[actionVal];
             if (rule && rule.reaction === "None") return;
@@ -1065,7 +1069,7 @@ function updateLineupState() {
             if (rule.reaction === "None" && !isSamePlayer) btn.classList.add('disabled');
             if (rule.reaction === "Same" && !isSameTeam && !isSamePlayer) btn.classList.add('disabled');
             if ((rule.reaction === "Opposite" || rule.reaction === "OppositeOrNone") && isSameTeam) btn.classList.add('disabled');
-            if (isSamePlayer && currentState.reactionPlayer) btn.classList.add('disabled');
+            if (isSamePlayer && rule.reaction !== "None") btn.classList.add('disabled');
         }
     });
 
@@ -1165,6 +1169,12 @@ async function logEventWithNote(kickoffNote) {
     }
     if (!rule.end_point && pitch.endPoint) {
         pitch.endPoint = null;
+    }
+    if (currentState.reactionPlayer && currentState.actionPlayer.id === currentState.reactionPlayer.id) {
+        alert("Action Player and Reaction Player cannot be the same.");
+        currentState.reactionPlayer = null;
+        updateLineupState();
+        return;
     }
     if (rule.reaction === "Same" && !currentState.reactionPlayer) {
         alert("Reaction Player is required (must be SAME team).");

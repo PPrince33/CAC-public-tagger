@@ -77,7 +77,7 @@ export const CAC_LOGIC = {
 
 export const ACTION_RULES = {
     "Pass": { end_point: true, reaction: "Same" }, 
-    "Shoot": { end_point: true, reaction: "OppositeOrNone" },
+    "Shoot": { end_point: true, reaction: "Opposite" },
     "Carry": { end_point: true, reaction: "None" }, 
     "Dribble": { end_point: true, reaction: "Opposite" },
     "Sliding Tackle": { end_point: false, reaction: "Opposite" }, 

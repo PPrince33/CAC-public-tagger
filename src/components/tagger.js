@@ -750,6 +750,19 @@ export async function initTagger() {
         // Toggle Goal Face and Shot Metadata
         document.getElementById('goal-face-overlay').style.display = act === 'Shoot' ? 'flex' : 'none';
         document.getElementById('shot-metadata-overlay').style.display = act === 'Shoot' ? 'flex' : 'none';
+
+        // Enforce end point / reaction player rules for the selected action
+        const rule = ACTION_RULES[act];
+        pitch.allowEndPoint = rule.end_point;
+        if (!rule.end_point && pitch.endPoint) {
+            pitch.endPoint = null;
+            pitch.draw();
+            document.getElementById('pitch-coords').innerText = `Start: ${pitch.startPoint ? pitch.startPoint.x+','+pitch.startPoint.y : 'None'} | End: None`;
+        }
+        if (rule.reaction === "None" && currentState.reactionPlayer) {
+            currentState.reactionPlayer = null;
+        }
+
         updateLineupState();
     };
 
@@ -1033,7 +1046,7 @@ function updateLineupState() {
 
             if (rule.reaction === "None" && !isSamePlayer) btn.classList.add('disabled');
             if (rule.reaction === "Same" && !isSameTeam && !isSamePlayer) btn.classList.add('disabled');
-            if ((rule.reaction === "Opposite" || rule.reaction === "OppositeOrNone") && isSameTeam) btn.classList.add('disabled');
+            if (rule.reaction === "Opposite" && isSameTeam) btn.classList.add('disabled');
             if (isSamePlayer && currentState.reactionPlayer) btn.classList.add('disabled');
         }
     });
@@ -1132,6 +1145,9 @@ async function logEventWithNote(kickoffNote) {
         alert("Mark an End Point on the pitch");
         return;
     }
+    if (!rule.end_point && pitch.endPoint) {
+        pitch.endPoint = null;
+    }
     if (rule.reaction === "Same" && !currentState.reactionPlayer) {
         alert("Reaction Player is required (must be SAME team).");
         return;
@@ -1146,10 +1162,6 @@ async function logEventWithNote(kickoffNote) {
     }
     if (rule.reaction === "Opposite" && currentState.reactionPlayer.teamId === currentState.actionPlayer.teamId) {
         alert("Reaction Player must be on the OPPONENT team.");
-        return;
-    }
-    if (rule.reaction === "OppositeOrNone" && currentState.reactionPlayer && currentState.reactionPlayer.teamId === currentState.actionPlayer.teamId) {
-        alert("Reaction Player must be on the OPPONENT team or None.");
         return;
     }
     if (rule.reaction === "None" && currentState.reactionPlayer) {

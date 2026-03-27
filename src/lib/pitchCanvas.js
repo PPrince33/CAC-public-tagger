@@ -8,6 +8,7 @@ export class PitchCanvas {
 
         this.startPoint = null;
         this.endPoint = null;
+        this.allowEndPoint = true;
         this.onCoordsChange = null;
 
         this.canvas.addEventListener('click', (e) => this.handleClick(e));
@@ -47,7 +48,7 @@ export class PitchCanvas {
         let pitchX = Math.round(Math.max(0, Math.min(((internalX / this.canvas.width) * (this.config.maxX + 2 * padX)) - padX, this.config.maxX)) * 100) / 100;
         let pitchY = Math.round(Math.max(0, Math.min((((this.canvas.height - internalY) / this.canvas.height) * (this.config.maxY + 2 * padY)) - padY, this.config.maxY)) * 100) / 100;
 
-        if (!this.startPoint || (this.startPoint && this.endPoint)) {
+        if (!this.startPoint || (this.startPoint && this.endPoint) || (this.startPoint && !this.allowEndPoint)) {
             this.startPoint = { x: pitchX, y: pitchY };
             this.endPoint = null;
         } else {

@@ -55,7 +55,7 @@ export function AnalyticsView() {
             </div>
         </div>
 
-        <div class="analytics-full">
+        <div class="analytics-full" id="leaderboard-section">
             <div class="card" style="padding: 20px;">
                 <h3 style="margin-bottom: 16px;">Top Taggers Leaderboard</h3>
                 <table class="leaderboard-table">
@@ -81,10 +81,37 @@ export function AnalyticsView() {
 
 export async function initAnalytics() {
     try {
+        // Get current user and role
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+        const isAdmin = profile?.role === 'admin';
+
+        // Build role-aware queries
+        let matchQuery, eventQuery, profileQuery;
+
+        if (isAdmin) {
+            // Admin sees everything
+            matchQuery = supabase.from('matches').select('match_id, created_by, created_at, status');
+            eventQuery = supabase.from('match_events').select('event_id, match_id, analyst_id, action, created_at');
+            profileQuery = supabase.from('profiles').select('id, username, role');
+        } else {
+            // Analyst sees only their own matches and events
+            matchQuery = supabase.from('matches')
+                .select('match_id, created_by, created_at, status, assigned_to')
+                .or(`created_by.eq.${user.id},assigned_to.eq.${user.id}`);
+            eventQuery = supabase.from('match_events')
+                .select('event_id, match_id, analyst_id, action, created_at')
+                .eq('analyst_id', user.id);
+            profileQuery = supabase.from('profiles')
+                .select('id, username, role')
+                .eq('id', user.id);
+        }
+
         const [matchRes, eventRes, profileRes] = await Promise.all([
-            supabase.from('matches').select('match_id, created_by, created_at, status'),
-            supabase.from('match_events').select('event_id, match_id, analyst_id, action, created_at'),
-            supabase.from('profiles').select('id, username, role'),
+            matchQuery,
+            eventQuery,
+            profileQuery,
         ]);
 
         const matches = matchRes.data || [];
@@ -103,14 +130,27 @@ export async function initAnalytics() {
         document.getElementById('stat-today-events').textContent = todayEvents;
         document.getElementById('stat-avg-events').textContent = avgEvents;
 
+        // Update header for analysts
+        if (!isAdmin) {
+            const subtitle = document.querySelector('.page-subtitle');
+            if (subtitle) subtitle.textContent = 'Your personal tagging statistics';
+            const title = document.querySelector('.page-title');
+            if (title) title.textContent = 'My Analytics';
+            // Hide leaderboard for analysts
+            const lb = document.getElementById('leaderboard-section');
+            if (lb) lb.style.display = 'none';
+        }
+
         // Daily events chart (last 30 days)
         renderDailyChart(events);
 
         // Action breakdown chart
         renderActionChart(events);
 
-        // Leaderboard
-        renderLeaderboard(events, matches, profiles);
+        // Leaderboard (only rendered for admins since section is hidden for analysts)
+        if (isAdmin) {
+            renderLeaderboard(events, matches, profiles);
+        }
     } catch (err) {
         console.error('Analytics load error:', err);
     }

@@ -82,7 +82,7 @@ export const ACTION_RULES = {
     "Dribble": { end_point: true, reaction: "Opposite" },
     "Sliding Tackle": { end_point: false, reaction: "Opposite" }, 
     "Standing Tackle": { end_point: false, reaction: "Opposite" },
-    "Save": { end_point: false, reaction: "Opposite" }, 
+    "Save": { end_point: false, reaction: "OppositeOrNone" }, 
     "Block": { end_point: false, reaction: "Opposite" },
     "Clearance": { end_point: false, reaction: "None" }, 
     "Pass Intercept": { end_point: false, reaction: "Opposite" },

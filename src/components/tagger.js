@@ -750,6 +750,19 @@ export async function initTagger() {
         // Toggle Goal Face and Shot Metadata
         document.getElementById('goal-face-overlay').style.display = act === 'Shoot' ? 'flex' : 'none';
         document.getElementById('shot-metadata-overlay').style.display = act === 'Shoot' ? 'flex' : 'none';
+
+        // Enforce end point / reaction player rules for the selected action
+        const rule = ACTION_RULES[act];
+        pitch.allowEndPoint = rule.end_point;
+        if (!rule.end_point && pitch.endPoint) {
+            pitch.endPoint = null;
+            pitch.draw();
+            document.getElementById('pitch-coords').innerText = `Start: ${pitch.startPoint ? pitch.startPoint.x+','+pitch.startPoint.y : 'None'} | End: None`;
+        }
+        if (rule.reaction === "None" && currentState.reactionPlayer) {
+            currentState.reactionPlayer = null;
+        }
+
         updateLineupState();
     };
 
@@ -802,6 +815,20 @@ export async function initTagger() {
             Object.keys(CAC_LOGIC[savedSession.action]).forEach(out => outcomeSelect.add(new Option(out, out)));
             document.getElementById('goal-face-overlay').style.display = savedSession.action === 'Shoot' ? 'flex' : 'none';
             document.getElementById('shot-metadata-overlay').style.display = savedSession.action === 'Shoot' ? 'flex' : 'none';
+
+            // Enforce end point / reaction player rules for the restored action
+            const rule = ACTION_RULES[savedSession.action];
+            if (rule) {
+                pitch.allowEndPoint = rule.end_point;
+                if (!rule.end_point && pitch.endPoint) {
+                    pitch.endPoint = null;
+                    pitch.draw();
+                    document.getElementById('pitch-coords').innerText = `Start: ${pitch.startPoint ? pitch.startPoint.x+','+pitch.startPoint.y : 'None'} | End: None`;
+                }
+                if (rule.reaction === "None" && currentState.reactionPlayer) {
+                    currentState.reactionPlayer = null;
+                }
+            }
         }
         if (savedSession.outcome && outcomeSelect.querySelector(`option[value="${savedSession.outcome}"]`)) {
             outcomeSelect.value = savedSession.outcome;
@@ -1005,6 +1032,10 @@ function renderPlayerGrids() {
                 currentState.actionPlayer = { id: playerId, teamId, name, jersey };
             }
         } else {
+            const actionVal = document.getElementById('action-select').value;
+            const rule = ACTION_RULES[actionVal];
+            if (rule && rule.reaction === "None") return;
+
             if (currentState.reactionPlayer?.id === playerId) {
                 currentState.reactionPlayer = null;
             } else {
@@ -1045,7 +1076,7 @@ function updateLineupState() {
     if (pitchPlayers) {
         let txt = '';
         if (currentState.actionPlayer) txt += `ACT: ${currentState.actionPlayer.name} #${currentState.actionPlayer.jersey}`;
-        if (currentState.reactionPlayer) txt += `  |  DEF: ${currentState.reactionPlayer.name} #${currentState.reactionPlayer.jersey}`;
+        if (currentState.reactionPlayer) txt += `  |  RCT: ${currentState.reactionPlayer.name} #${currentState.reactionPlayer.jersey}`;
         pitchPlayers.innerText = txt || '';
     }
     saveSessionState();
@@ -1131,6 +1162,9 @@ async function logEventWithNote(kickoffNote) {
     if (rule.end_point && !pitch.endPoint) {
         alert("Mark an End Point on the pitch");
         return;
+    }
+    if (!rule.end_point && pitch.endPoint) {
+        pitch.endPoint = null;
     }
     if (rule.reaction === "Same" && !currentState.reactionPlayer) {
         alert("Reaction Player is required (must be SAME team).");
@@ -1354,7 +1388,7 @@ function renderStaging() {
                 <td style="padding: 6px;">${e.pressure_on ? 'Y' : 'N'}</td>
                 <td style="padding: 6px; white-space: nowrap;">
                     ACT: ${playerDisplay}<br>
-                    ${reactionDisplay ? '<span style="color:var(--text-muted);font-size:0.65rem;">DEF: '+reactionDisplay+'</span>' : ''}
+                    ${reactionDisplay ? '<span style="color:var(--text-muted);font-size:0.65rem;">RCT: '+reactionDisplay+'</span>' : ''}
                 </td>
                 <td style="padding: 6px; font-family: var(--font-mono); font-size: 0.65rem; white-space: nowrap;">
                     S: ${e.start_x},${e.start_y}<br>

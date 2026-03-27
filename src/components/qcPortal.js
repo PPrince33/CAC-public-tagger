@@ -511,6 +511,7 @@ function drawGoalFace(eventObj) {
     if (!gc) return;
     gc.style.display = 'block';
     const ctx = gc.getContext('2d');
+    if (!ctx) return;
     ctx.clearRect(0, 0, gc.width, gc.height);
 
     const pw = isMatchFutsal ? 20 : 80, gw = isMatchFutsal ? 3 : 7.32, gh = isMatchFutsal ? 2 : 2.44;

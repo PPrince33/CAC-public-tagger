@@ -11,6 +11,8 @@ export class VideoEngine {
         this.ptzMode = false;
         this.ptz = { scale: 1, x: 0, y: 0, active: false, startX: 0, startY: 0 };
         
+        if (!this.container) return;
+
         // Build internal structure for PTZ
         this.container.innerHTML = `
             <div id="ve-inner" style="position: relative; width: 100%; height: 100%; overflow: hidden; background: black;">
@@ -33,12 +35,14 @@ export class VideoEngine {
         this.currentUrl = null;
 
         this.init();
-        this.setupPTZ();
+        if (this.ptzOverlay) this.setupPTZ();
         
-        this.container.querySelector('#ve-bring-back-btn').addEventListener('click', () => this.restoreVideoFromPiPAndClose());
+        const bringBackBtn = this.container.querySelector('#ve-bring-back-btn');
+        if (bringBackBtn) bringBackBtn.addEventListener('click', () => this.restoreVideoFromPiPAndClose());
     }
 
     init() {
+        if (!this.transformWrap) return;
         if (this.videoType === 'local') {
             this.player = document.createElement('video');
             this.player.style.width = '100%';
@@ -55,9 +59,19 @@ export class VideoEngine {
                 const tag = document.createElement('script');
                 tag.src = "https://www.youtube.com/iframe_api";
                 const firstScriptTag = document.getElementsByTagName('script')[0];
-                firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-                window.onYouTubeIframeAPIReady = () => {
+                if (firstScriptTag && firstScriptTag.parentNode) {
+                    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+                } else {
+                    document.head.appendChild(tag);
+                }
+                // Use a list to support multiple VideoEngine instances
+                if (!window._ytReadyCallbacks) window._ytReadyCallbacks = [];
+                window._ytReadyCallbacks.push(() => {
                     if (this.currentUrl) this.loadYouTube(this.currentUrl);
+                });
+                window.onYouTubeIframeAPIReady = () => {
+                    (window._ytReadyCallbacks || []).forEach(cb => cb());
+                    window._ytReadyCallbacks = [];
                 };
             }
         }
@@ -73,7 +87,7 @@ export class VideoEngine {
         const videoId = this.extractYTId(url);
         if (!videoId) return;
 
-        if (window.YT && window.YT.Player) {
+        if (window.YT && window.YT.Player && this.transformWrap) {
             this.transformWrap.innerHTML = '<div id="ve-yt-player"></div>';
             this.ytPlayer = new window.YT.Player('ve-yt-player', {
                 height: '100%',
@@ -131,7 +145,7 @@ export class VideoEngine {
     // ==========================================
     togglePTZ() {
         this.ptzMode = !this.ptzMode;
-        this.ptzOverlay.style.display = this.ptzMode ? 'block' : 'none';
+        if (this.ptzOverlay) this.ptzOverlay.style.display = this.ptzMode ? 'block' : 'none';
         return this.ptzMode;
     }
 
@@ -141,7 +155,7 @@ export class VideoEngine {
     }
 
     applyPTZ() {
-        this.transformWrap.style.transform = `translate(${this.ptz.x}px, ${this.ptz.y}px) scale(${this.ptz.scale})`;
+        if (this.transformWrap) this.transformWrap.style.transform = `translate(${this.ptz.x}px, ${this.ptz.y}px) scale(${this.ptz.scale})`;
     }
 
     setupPTZ() {
@@ -169,7 +183,7 @@ export class VideoEngine {
 
         const handleMouseUp = () => {
             this.ptz.active = false;
-            this.ptzOverlay.style.cursor = 'grab';
+            if (this.ptzOverlay) this.ptzOverlay.style.cursor = 'grab';
         };
 
         document.addEventListener('mousemove', handleMouseMove);
@@ -284,8 +298,8 @@ export class VideoEngine {
         win.document.body.style.overflow = 'hidden';
 
         // Move the entire internal wrapper into the new window
-        win.document.body.appendChild(this.inner);
-        this.emptyState.style.display = 'flex';
+        if (this.inner) win.document.body.appendChild(this.inner);
+        if (this.emptyState) this.emptyState.style.display = 'flex';
 
         // YouTube specific: if we move the DOM, the iframe reloads and drops connection to the API. 
         // We MUST re-initialize the player in the new window context.
@@ -294,13 +308,15 @@ export class VideoEngine {
             let startAt = 0;
             try { startAt = this.ytPlayer.getCurrentTime(); } catch(e){}
             
-            this.transformWrap.innerHTML = '<div id="ve-yt-player"></div>';
-            this.ytPlayer = new win.YT.Player('ve-yt-player', {
-                height: '100%',
-                width: '100%',
-                videoId: videoId,
-                playerVars: { 'autoplay': 1, 'playsinline': 1, 'start': Math.floor(startAt) }
-            });
+            if (this.transformWrap && win.YT && win.YT.Player) {
+                this.transformWrap.innerHTML = '<div id="ve-yt-player"></div>';
+                this.ytPlayer = new win.YT.Player('ve-yt-player', {
+                    height: '100%',
+                    width: '100%',
+                    videoId: videoId,
+                    playerVars: { 'autoplay': 1, 'playsinline': 1, 'start': Math.floor(startAt) }
+                });
+            }
         }
 
         win.addEventListener('pagehide', () => this.restoreVideoFromPiP());
@@ -319,27 +335,29 @@ export class VideoEngine {
                 this.applyPTZ();
             }
         });
-        win.addEventListener('mouseup', () => { this.ptz.active = false; this.ptzOverlay.style.cursor = 'grab'; });
+        win.addEventListener('mouseup', () => { this.ptz.active = false; if (this.ptzOverlay) this.ptzOverlay.style.cursor = 'grab'; });
     }
 
     restoreVideoFromPiP() {
         if (!this.extWindow) return;
         
-        this.emptyState.style.display = 'none';
-        this.container.insertBefore(this.inner, this.emptyState);
+        if (this.emptyState) this.emptyState.style.display = 'none';
+        if (this.inner && this.container) this.container.insertBefore(this.inner, this.emptyState);
         
         if (this.videoType === 'youtube' && this.ytPlayer && this.currentUrl) {
             const videoId = this.extractYTId(this.currentUrl);
             let currentTime = 0;
             try { currentTime = this.ytPlayer.getCurrentTime(); } catch(e){}
             
-            this.transformWrap.innerHTML = '<div id="ve-yt-player"></div>';
-            this.ytPlayer = new window.YT.Player('ve-yt-player', {
-                height: '100%',
-                width: '100%',
-                videoId: videoId,
-                playerVars: { 'autoplay': 1, 'playsinline': 1, 'start': Math.floor(currentTime) }
-            });
+            if (this.transformWrap) {
+                this.transformWrap.innerHTML = '<div id="ve-yt-player"></div>';
+                this.ytPlayer = new window.YT.Player('ve-yt-player', {
+                    height: '100%',
+                    width: '100%',
+                    videoId: videoId,
+                    playerVars: { 'autoplay': 1, 'playsinline': 1, 'start': Math.floor(currentTime) }
+                });
+            }
         }
         
         this.resetPTZ();

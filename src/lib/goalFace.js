@@ -34,6 +34,7 @@ export class GoalFaceCanvas {
     }
 
     handleClick(e) {
+        if (!this.canvas || !this.ctx) return;
         const rect = this.canvas.getBoundingClientRect();
         const clickX = (e.clientX - rect.left) * (this.canvas.width / rect.width);
         const clickY = (e.clientY - rect.top) * (this.canvas.height / rect.height);
@@ -59,6 +60,7 @@ export class GoalFaceCanvas {
     }
 
     draw() {
+        if (!this.ctx || !this.canvas) return;
         const ctx = this.ctx;
         const gc = this.canvas;
         const c = this.getColors();

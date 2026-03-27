@@ -319,6 +319,7 @@ let video = null;
 let activeMatch = null;
 let activeLineup = [];
 let localEvents = [];
+let syncedEvents = [];
 let undoStack = []; // For undo functionality
 let lockHeartbeatInterval = null;
 let autoSyncPending = false;
@@ -1021,7 +1022,9 @@ function updateLineupState() {
 
     document.querySelectorAll('.player-btn').forEach(btn => {
         btn.classList.remove('action-active', 'reaction-active', 'disabled');
-        const pId = btn.className.match(/p-([\w-]+)/)[1];
+        const pIdMatch = btn.className.match(/p-([\w-]+)/);
+        if (!pIdMatch) return;
+        const pId = pIdMatch[1];
         const lineupItem = activeLineup.find(l => l.player_id === pId);
 
         if (currentState.actionPlayer?.id === pId) btn.classList.add('action-active');
@@ -1074,11 +1077,11 @@ function handleHotkeys(e) {
 
     if (e.code === 'Space') {
         e.preventDefault();
-        video.togglePlay();
+        if (video) video.togglePlay();
     } else if (e.code === 'ArrowRight') {
-        video.seek(video.getCurrentTime() + 3);
+        if (video) video.seek(video.getCurrentTime() + 3);
     } else if (e.code === 'ArrowLeft') {
-        video.seek(video.getCurrentTime() - 3);
+        if (video) video.seek(video.getCurrentTime() - 3);
     } else if (e.code === 'Enter') {
         e.preventDefault();
         logEvent();
@@ -1323,7 +1326,6 @@ function getFinalDirection() {
 // ──────────────────────────────────────────
 // STAGING / EVENT LOG
 // ──────────────────────────────────────────
-let syncedEvents = [];
 
 function renderStaging() {
     const body = document.getElementById('staging-body');

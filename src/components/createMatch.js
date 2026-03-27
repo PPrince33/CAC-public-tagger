@@ -211,7 +211,11 @@ async function handleFile(file) {
 
         // Validation
         const requiredHeaders = ['Team_Name', 'Is_home', 'Jersey_No', 'Player_Name', 'Starting_XI', 'Position'];
-        const headers = XLSX.utils.sheet_to_json(worksheet, { header: 1 })[0];
+        const headerRow = XLSX.utils.sheet_to_json(worksheet, { header: 1 })[0];
+        if (!headerRow) {
+            throw new Error('File appears to be empty. No header row found.');
+        }
+        const headers = headerRow;
         
         const missing = requiredHeaders.filter(h => !headers.includes(h));
         if (missing.length > 0) {

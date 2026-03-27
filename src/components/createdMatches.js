@@ -59,7 +59,7 @@ export async function initMatches() {
         }
 
         grid.innerHTML = matches.map(m => {
-            const isLocked = m.locked_by && m.locked_by !== user.id &&
+            const isLocked = m.locked_by && m.locked_by !== user.id && m.locked_at &&
                 (Date.now() - new Date(m.locked_at).getTime() < 10 * 60 * 1000);
             const lockerName = lockUsernames[m.locked_by] || 'Someone';
             const isAssigned = m.assigned_to && m.created_by === user.id;

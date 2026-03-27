@@ -36,6 +36,7 @@ export class PitchCanvas {
     }
 
     handleClick(e) {
+        if (!this.canvas || !this.ctx) return;
         const rect = this.canvas.getBoundingClientRect();
         const internalX = (e.clientX - rect.left) * (this.canvas.width / rect.width);
         const internalY = (e.clientY - rect.top) * (this.canvas.height / rect.height);
@@ -59,6 +60,7 @@ export class PitchCanvas {
     }
 
     draw() {
+        if (!this.ctx || !this.canvas) return;
         const ctx = this.ctx;
         const p = this.config;
         const padX = p.maxX * 0.05;
@@ -125,7 +127,7 @@ export class PitchCanvas {
     }
 
     clear() {
-        if (!this.ctx) return;
+        if (!this.ctx || !this.canvas) return;
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         this.startPoint = null;
         this.endPoint = null;

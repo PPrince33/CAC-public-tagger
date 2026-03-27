@@ -22,7 +22,7 @@ export function processMatchEvents(events, isFutsal) {
         pEvent.match_minute = Math.floor(e.match_time_seconds / 60) + 1;
 
         // Pass Distance
-        if (e.start_x !== null && e.end_x !== null) {
+        if (e.start_x !== null && e.end_x !== null && e.start_y !== null && e.end_y !== null) {
             const dx = e.end_x - e.start_x;
             const dy = e.end_y - e.start_y;
             pEvent.distance = Math.round(Math.sqrt(dx*dx + dy*dy) * 100) / 100;
@@ -77,7 +77,9 @@ function calculateXG(x, y, bodyPart, isFutsal, pitchLen, pitchWid, goalWid, subO
     const distPost2Sq = Math.pow(goalX - x, 2) + Math.pow(post2Y - y, 2);
     const goalWidSq = Math.pow(goalWid, 2);
     
-    let angleCos = (distPost1Sq + distPost2Sq - goalWidSq) / (2 * Math.sqrt(distPost1Sq) * Math.sqrt(distPost2Sq));
+    const denom = 2 * Math.sqrt(distPost1Sq) * Math.sqrt(distPost2Sq);
+    if (denom === 0) return 0.99; // Shooter is exactly at goal line center
+    let angleCos = (distPost1Sq + distPost2Sq - goalWidSq) / denom;
     angleCos = Math.max(-1, Math.min(1, angleCos)); 
     const angle = Math.acos(angleCos);
 
@@ -94,5 +96,6 @@ function calculateXG(x, y, bodyPart, isFutsal, pitchLen, pitchWid, goalWid, subO
     const logit = intercept + (coefDist * distance) + (coefAngle * angle);
     let xg = 1 / (1 + Math.exp(-logit));
     
-    return parseFloat(Math.max(0.01, Math.min(0.99, xg)).toFixed(3));
+    const result = parseFloat(Math.max(0.01, Math.min(0.99, xg)).toFixed(3));
+    return isNaN(result) ? null : result;
 }

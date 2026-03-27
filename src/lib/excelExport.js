@@ -41,14 +41,21 @@ export function exportToExcel(data, filename) {
 }
 
 export function exportToCSV(data, filename) {
-    const rows = buildExportRows(data);
-    const worksheet = XLSX.utils.json_to_sheet(rows);
-    const csv = XLSX.utils.sheet_to_csv(worksheet);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${filename}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    let url = null;
+    try {
+        const rows = buildExportRows(data);
+        const worksheet = XLSX.utils.json_to_sheet(rows);
+        const csv = XLSX.utils.sheet_to_csv(worksheet);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${filename}.csv`;
+        a.click();
+    } catch (err) {
+        console.error('CSV export failed:', err);
+        alert('CSV export failed: ' + err.message);
+    } finally {
+        if (url) URL.revokeObjectURL(url);
+    }
 }

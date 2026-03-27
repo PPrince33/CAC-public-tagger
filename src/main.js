@@ -21,6 +21,7 @@ class App {
         this.userRole = null;
         this._sessionWarningTimer = null;
         this._sessionExpireTimer = null;
+        this._isRendering = false;
 
         // Global error handling
         window.addEventListener('error', (e) => this.showFatalError(e.message));
@@ -139,6 +140,16 @@ class App {
     }
 
     async render() {
+        if (this._isRendering) return;
+        this._isRendering = true;
+        try {
+            await this._doRender();
+        } finally {
+            this._isRendering = false;
+        }
+    }
+
+    async _doRender() {
         const hash = window.location.hash || '#create-match';
         const route = router.getRoute(hash);
 
@@ -162,7 +173,13 @@ class App {
                 </div>
             `;
             const authContent = document.getElementById('auth-content');
-            authContent.innerHTML = await route.component();
+            if (!authContent) return;
+            try {
+                authContent.innerHTML = await route.component();
+            } catch (err) {
+                console.error('Failed to load component:', err);
+                authContent.innerHTML = '<p style="color:var(--danger);text-align:center;">Failed to load page. Please try refreshing.</p>';
+            }
         } else {
             // Authenticated layout
             const displayName = esc(this.user.user_metadata?.username ?? 'User');
@@ -224,11 +241,20 @@ class App {
             `;
 
             const mainView = document.getElementById('main-view');
-            mainView.innerHTML = await route.component();
+            if (!mainView) return;
+            try {
+                mainView.innerHTML = await route.component();
+            } catch (err) {
+                console.error('Failed to load component:', err);
+                mainView.innerHTML = '<p style="color:var(--danger);text-align:center;">Failed to load page. Please try refreshing.</p>';
+            }
 
-            document.getElementById('logout-btn').addEventListener('click', () => {
-                supabase.auth.signOut();
-            });
+            const logoutBtn = document.getElementById('logout-btn');
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', () => {
+                    supabase.auth.signOut();
+                });
+            }
 
             const themeCheckbox = document.getElementById('theme-checkbox');
             if (themeCheckbox) {
@@ -255,7 +281,8 @@ class App {
         const updateBanner = () => {
             if (!navigator.onLine) {
                 banner.style.display = 'flex';
-                document.getElementById('offline-text').textContent = 'You are offline — events saved locally';
+                const offlineText = document.getElementById('offline-text');
+                if (offlineText) offlineText.textContent = 'You are offline — events saved locally';
             } else {
                 banner.style.display = 'none';
             }

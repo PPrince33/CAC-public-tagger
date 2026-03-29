@@ -1065,7 +1065,7 @@ export async function initTagger() {
         }
     });
 
-    addEventBtn.addEventListener('click', logEvent);
+    addEventBtn.addEventListener('click', () => logEventWithNote(''));
     syncBtn.addEventListener('click', syncEvents);
 
     // Undo button
@@ -1319,9 +1319,6 @@ function handleHotkeys(e) {
     // ── Log Event (debounced) ──
     } else if (e.code === 'Enter') {
         e.preventDefault();
-        const now = Date.now();
-        if (now - _lastLogTime < 500) return; // Debounce 500ms
-        _lastLogTime = now;
         logEvent();
 
     // ── Shortcuts Modal ──
@@ -1383,6 +1380,9 @@ function selectPlayerByJersey(jersey) {
 // LOG EVENT
 // ──────────────────────────────────────────
 async function logEvent() {
+    const now = Date.now();
+    if (now - _lastLogTime < 500) return; // Debounce 500ms (keyboard Enter only)
+    _lastLogTime = now;
     await logEventWithNote("");
 }
 

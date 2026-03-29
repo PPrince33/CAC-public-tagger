@@ -140,22 +140,24 @@ export function TaggerView() {
                         </div>
                     </div>
 
-                    <!-- Action Controls — Button Matrix -->
+                    <!-- Action Controls -->
                     <div class="card" style="padding: 16px; flex-shrink: 0;">
-                        <div class="form-group" style="margin-bottom: 10px;">
-                            <label class="form-label" style="margin-bottom: 6px;">Action <span style="font-size: 0.7rem; color: var(--text-muted);">(hotkey shown)</span></label>
-                            <div id="action-btn-grid" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                            <div class="form-group">
+                                <label class="form-label">Action</label>
+                                <select id="action-select" class="form-input" style="font-size: 0.8125rem;"></select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Outcome <span style="font-size: 0.7rem; color: var(--text-muted);">[Tab]</span></label>
+                                <select id="outcome-select" class="form-input" style="font-size: 0.8125rem;"></select>
+                            </div>
                         </div>
-                        <div class="form-group" style="margin-bottom: 10px;">
-                            <label class="form-label" style="margin-bottom: 6px;">Outcome <span style="font-size: 0.7rem; color: var(--text-muted);">[Tab] to cycle</span></label>
-                            <div id="outcome-btn-grid" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
-                        </div>
-                        <div class="form-group" style="margin-bottom: 10px;">
-                            <label class="form-label" style="margin-bottom: 6px;">Type</label>
-                            <div id="type-btn-grid" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
-                        </div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px;">
-                            <div class="form-group" style="margin-bottom: 0;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                            <div class="form-group">
+                                <label class="form-label">Type</label>
+                                <select id="type-select" class="form-input" style="font-size: 0.8125rem;"></select>
+                            </div>
+                            <div class="form-group">
                                 <label class="form-label">Body Part</label>
                                 <select id="body-part-select" class="form-input" style="font-size: 0.8125rem;">
                                     <option value="Right Leg" selected>Right Leg [R]</option>
@@ -165,10 +167,12 @@ export function TaggerView() {
                                     <option value="NA">N/A</option>
                                 </select>
                             </div>
-                            <button id="pressure-btn" style="align-self:end;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-md);background:transparent;color:var(--text-main);font-size:0.8125rem;font-weight:600;font-family:inherit;cursor:pointer;">
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
+                            <button id="pressure-btn" style="padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-md);background:transparent;color:var(--text-main);font-size:0.8125rem;font-weight:600;font-family:inherit;cursor:pointer;">
                                 Pressure: OFF [V]
                             </button>
-                            <button id="direction-btn" style="align-self:end;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-md);background:transparent;color:var(--text-main);font-size:0.8125rem;font-weight:600;font-family:inherit;cursor:pointer;">
+                            <button id="direction-btn" style="padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-md);background:transparent;color:var(--text-main);font-size:0.8125rem;font-weight:600;font-family:inherit;cursor:pointer;">
                                 Direct: L2R
                             </button>
                         </div>
@@ -179,10 +183,6 @@ export function TaggerView() {
                         <button id="add-event-btn" style="width:100%;padding:14px 20px;border:none;border-radius:var(--radius-md);background:#22c55e;color:white;font-size:1rem;font-weight:800;font-family:inherit;cursor:pointer;letter-spacing:0.02em;transition:all 0.15s ease;">Log Event [Enter]</button>
                     </div>
 
-                    <!-- Hidden selects for internal state (used by JS logic) -->
-                    <select id="action-select" style="display:none;"></select>
-                    <select id="outcome-select" style="display:none;"></select>
-                    <select id="type-select" style="display:none;"></select>
 
                     <!-- Lineup Grid -->
                     <div class="card" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 16px; min-height: 400px; flex-shrink: 0;">
@@ -933,12 +933,10 @@ export async function initTagger() {
         });
     };
 
-    actionSelect.addEventListener('change', () => { updateOutcomes(); renderActionButtons(); renderOutcomeButtons(); renderTypeButtons(); saveSessionState(); });
-    outcomeSelect.addEventListener('change', () => { updateTypes(); renderOutcomeButtons(); renderTypeButtons(); saveSessionState(); });
-    typeSelect.addEventListener('change', () => { renderTypeButtons(); saveSessionState(); });
+    actionSelect.addEventListener('change', () => { updateOutcomes(); saveSessionState(); });
+    outcomeSelect.addEventListener('change', () => { updateTypes(); saveSessionState(); });
     _restoringSession = true;
     updateOutcomes();
-    renderAllButtonGrids();
 
     // 4. Fetch Lineups
     const { data: lineup, error: lErr } = await supabase
@@ -1004,7 +1002,6 @@ export async function initTagger() {
         }
 
         updateLineupState();
-        renderAllButtonGrids();
         directionBtn.innerText = `Direct: ${currentState.homeDirection}`;
 
         _restoringSession = false;
@@ -1268,7 +1265,6 @@ function handleHotkeys(e) {
         }
         outcomeSelect.selectedIndex = idx;
         outcomeSelect.dispatchEvent(new Event('change'));
-        renderOutcomeButtons();
         return;
     }
 
@@ -1343,7 +1339,6 @@ function handleHotkeys(e) {
         if (actionSelect.querySelector(`option[value="${action}"]`)) {
             actionSelect.value = action;
             actionSelect.dispatchEvent(new Event('change'));
-            renderActionButtons();
         }
 
     // ── Outcome: Missed ──
@@ -1351,7 +1346,6 @@ function handleHotkeys(e) {
         if (actionSelect && ['Pass', 'Through Ball'].includes(actionSelect.value)) {
             outcomeSelect.value = 'Missed';
             outcomeSelect.dispatchEvent(new Event('change'));
-            renderOutcomeButtons();
         }
 
     // ── Body Part Hotkeys ──
@@ -1596,7 +1590,6 @@ async function logEventWithNote(kickoffNote) {
 
     currentState.actionPlayer = nextActionPlayer;
     currentState.reactionPlayer = nextReactionPlayer;
-    renderAllButtonGrids();
     updateLineupState();
 }
 

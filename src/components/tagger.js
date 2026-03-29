@@ -339,6 +339,7 @@ let lockHeartbeatInterval = null;
 let autoSyncPending = false;
 let _lastLogTime = 0; // Debounce for Enter key
 let _toastTimeout = null; // Toast dismissal timer
+let _initAbortController = null; // AbortController for cleaning up event listeners on re-init
 let currentState = {
     actionPlayer: null,
     reactionPlayer: null,
@@ -745,6 +746,11 @@ export async function initTagger() {
     const finishBtn = document.getElementById('finish-match-btn');
     const pressureBtn = document.getElementById('pressure-btn');
 
+    // Abort previous listeners to prevent accumulation on re-init
+    if (_initAbortController) _initAbortController.abort();
+    _initAbortController = new AbortController();
+    const { signal } = _initAbortController;
+
     // Remove existing listener to prevent accumulation
     document.removeEventListener('keydown', handleHotkeys);
     document.addEventListener('keydown', handleHotkeys);
@@ -836,7 +842,7 @@ export async function initTagger() {
         }
     };
     updateVideoSourceUI();
-    videoSourceSelect.addEventListener('change', updateVideoSourceUI);
+    videoSourceSelect.addEventListener('change', updateVideoSourceUI, { signal });
 
     video = new VideoEngine('video-container', initialSource);
     if (match.video_url) video.loadYouTube(match.video_url);
@@ -848,7 +854,7 @@ export async function initTagger() {
         video = new VideoEngine('video-container', 'youtube');
         video.loadYouTube(url);
         await supabase.from('matches').update({ video_url: url }).eq('match_id', matchId);
-    });
+    }, { signal });
 
     pitch.onCoordsChange = (start, end, e) => {
         document.getElementById('pitch-coords').innerText = `Start: ${start ? start.x+','+start.y : 'None'} | End: ${end ? end.x+','+end.y : 'None'}`;
@@ -933,8 +939,8 @@ export async function initTagger() {
         });
     };
 
-    actionSelect.addEventListener('change', () => { updateOutcomes(); saveSessionState(); });
-    outcomeSelect.addEventListener('change', () => { updateTypes(); saveSessionState(); });
+    actionSelect.addEventListener('change', () => { updateOutcomes(); saveSessionState(); }, { signal });
+    outcomeSelect.addEventListener('change', () => { updateTypes(); saveSessionState(); }, { signal });
     _restoringSession = true;
     updateOutcomes();
 
@@ -1018,33 +1024,33 @@ export async function initTagger() {
         currentState.isPressureOn = !currentState.isPressureOn;
         pressureBtn.innerText = `Pressure: ${currentState.isPressureOn ? 'ON' : 'OFF'}`;
         pressureBtn.style.background = currentState.isPressureOn ? 'var(--danger)' : 'transparent';
-    });
+    }, { signal });
 
     directionBtn.addEventListener('click', () => {
         currentState.homeDirection = currentState.homeDirection === 'L2R' ? 'R2L' : 'L2R';
         directionBtn.innerText = `Direct: ${currentState.homeDirection}`;
         saveSessionState();
-    });
+    }, { signal });
 
     document.getElementById('clear-pitch-btn').addEventListener('click', () => {
         pitch.reset();
         pitch.draw();
         document.getElementById('pitch-coords').innerText = 'Start: None | End: None';
         saveSessionState();
-    });
+    }, { signal });
 
     document.getElementById('deselect-players-btn').addEventListener('click', () => {
         currentState.actionPlayer = null;
         currentState.reactionPlayer = null;
         updateLineupState();
-    });
+    }, { signal });
 
     document.getElementById('toggle-sidebar-btn').addEventListener('click', () => {
         const sidebar = document.querySelector('.sidebar');
         if (sidebar) {
             sidebar.style.display = sidebar.style.display === 'none' ? 'flex' : 'none';
         }
-    });
+    }, { signal });
 
     document.getElementById('back-to-matches').addEventListener('click', () => {
         if (mainView) {
@@ -1052,35 +1058,35 @@ export async function initTagger() {
             mainView.style.padding = '';
         }
         window.location.hash = '#matches';
-    });
+    }, { signal });
 
     uploadLocalBtn.addEventListener('click', () => {
         document.getElementById('local-video-file').click();
-    });
+    }, { signal });
 
     document.getElementById('local-video-file').addEventListener('change', (e) => {
         if (e.target.files[0]) {
             video = new VideoEngine('video-container', 'local');
             video.loadLocalFile(e.target.files[0]);
         }
-    });
+    }, { signal });
 
-    addEventBtn.addEventListener('click', () => logEventWithNote(''));
-    syncBtn.addEventListener('click', syncEvents);
+    addEventBtn.addEventListener('click', () => logEventWithNote(''), { signal });
+    syncBtn.addEventListener('click', syncEvents, { signal });
 
     // Undo button
-    document.getElementById('undo-btn').addEventListener('click', undoLastEvent);
+    document.getElementById('undo-btn').addEventListener('click', undoLastEvent, { signal });
 
     // Keyboard shortcuts modal
-    document.getElementById('shortcuts-btn').addEventListener('click', toggleShortcutsModal);
+    document.getElementById('shortcuts-btn').addEventListener('click', toggleShortcutsModal, { signal });
     document.getElementById('close-shortcuts').addEventListener('click', () => {
         document.getElementById('shortcuts-modal').style.display = 'none';
-    });
+    }, { signal });
     document.getElementById('shortcuts-modal').addEventListener('click', (e) => {
         if (e.target.id === 'shortcuts-modal') {
             document.getElementById('shortcuts-modal').style.display = 'none';
         }
-    });
+    }, { signal });
 
     finishBtn.addEventListener('click', async () => {
         if (localEvents.length > 0) {
@@ -1095,7 +1101,7 @@ export async function initTagger() {
             alert("Match submitted to QC!");
             window.location.hash = '#matches';
         }
-    });
+    }, { signal });
 
     // Modal Events
     document.getElementById('btn-ko-l2r').addEventListener('click', () => {
@@ -1103,13 +1109,13 @@ export async function initTagger() {
         currentState.homeDirection = 'L2R';
         document.getElementById('direction-btn').innerText = `Direct: L2R`;
         logEventWithNote(`Home Direction Set: L2R`);
-    });
+    }, { signal });
     document.getElementById('btn-ko-r2l').addEventListener('click', () => {
         document.getElementById('kickoff-modal').style.display = 'none';
         currentState.homeDirection = 'R2L';
         document.getElementById('direction-btn').innerText = `Direct: R2L`;
         logEventWithNote(`Home Direction Set: R2L`);
-    });
+    }, { signal });
 
     // Setup auto-sync on reconnect
     setupAutoSync();

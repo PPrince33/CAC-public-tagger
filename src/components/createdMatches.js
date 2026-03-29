@@ -23,30 +23,27 @@ export async function initMatches() {
     try {
         const { data: { user } } = await supabase.auth.getUser();
 
-        // Fetch matches created by user OR assigned to user
-        const { data: matches, error } = await supabase
-            .from('matches')
-            .select(`
-                match_id, match_name, match_date, status, video_url, locked_by, locked_at, assigned_to, created_by,
-                home_team:teams!home_team_id(team_name),
-                away_team:teams!away_team_id(team_name)
-            `)
-            .or(`created_by.eq.${user.id},assigned_to.eq.${user.id}`)
-            .order('created_at', { ascending: false });
+        // Fetch matches and analysts in parallel
+        const [matchesResult, analystsResult] = await Promise.all([
+            supabase
+                .from('matches')
+                .select(`
+                    match_id, match_name, match_date, status, video_url, locked_by, locked_at, assigned_to, created_by,
+                    home_team:teams!home_team_id(team_name),
+                    away_team:teams!away_team_id(team_name)
+                `)
+                .or(`created_by.eq.${user.id},assigned_to.eq.${user.id}`)
+                .order('created_at', { ascending: false }),
+            supabase.from('profiles').select('id, username').order('username')
+        ]);
 
-        if (error) throw error;
+        if (matchesResult.error) throw matchesResult.error;
+        const matches = matchesResult.data;
+        const analystList = analystsResult.data || [];
 
-        // Fetch all analysts for assignment dropdown
-        const { data: analysts } = await supabase.from('profiles').select('id, username').order('username');
-        const analystList = analysts || [];
-
-        // Get lock usernames
-        const lockUserIds = [...new Set(matches?.filter(m => m.locked_by).map(m => m.locked_by) || [])];
+        // Get lock usernames from the already-fetched analyst list
         let lockUsernames = {};
-        if (lockUserIds.length > 0) {
-            const { data: lockUsers } = await supabase.from('profiles').select('id, username').in('id', lockUserIds);
-            (lockUsers || []).forEach(u => { lockUsernames[u.id] = u.username; });
-        }
+        (analystList).forEach(u => { lockUsernames[u.id] = u.username; });
 
         if (!matches || matches.length === 0) {
             grid.innerHTML = `

@@ -113,16 +113,21 @@ class App {
         this.userRole = null;
 
         if (user) {
-            // Fetch role once on auth change
-            try {
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('role')
-                    .eq('id', user.id)
-                    .single();
-                this.userRole = profile?.role || 'analyst';
-            } catch (e) {
-                this.userRole = 'analyst';
+            // Fetch role with retry on failure
+            for (let attempt = 0; attempt < 2; attempt++) {
+                try {
+                    const { data: profile, error } = await supabase
+                        .from('profiles')
+                        .select('role')
+                        .eq('id', user.id)
+                        .single();
+                    if (error) throw error;
+                    this.userRole = profile?.role || 'analyst';
+                    break;
+                } catch (e) {
+                    console.warn(`Role fetch attempt ${attempt + 1} failed:`, e.message);
+                    if (attempt === 1) this.userRole = 'analyst';
+                }
             }
             this.resetSessionTimers();
         } else {

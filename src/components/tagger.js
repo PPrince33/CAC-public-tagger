@@ -1383,7 +1383,7 @@ function selectPlayerByJersey(jersey) {
 // LOG EVENT
 // ──────────────────────────────────────────
 async function logEvent() {
-    logEventWithNote("");
+    await logEventWithNote("");
 }
 
 async function logEventWithNote(kickoffNote) {
@@ -1398,7 +1398,10 @@ async function logEventWithNote(kickoffNote) {
 
     const actionVal = document.getElementById('action-select').value;
     const rule = ACTION_RULES[actionVal];
-
+    if (!rule) {
+        alert(`Invalid action selected: "${actionVal}". Please pick a valid action.`);
+        return;
+    }
     if (rule.end_point && !pitch.endPoint) {
         alert("Mark an End Point on the pitch");
         return;

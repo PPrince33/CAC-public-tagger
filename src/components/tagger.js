@@ -17,15 +17,15 @@ export function TaggerView() {
                 </div>
                 <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                     <!-- Progress Indicator -->
-                    <div id="progress-indicator" style="display: flex; align-items: center; gap: 6px; font-size: 0.7rem; color: var(--text-muted); padding: 4px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-card);">
+                    <div id="progress-indicator" style="display: flex; align-items: center; gap: 6px; font-size: 0.8125rem; color: var(--text-muted); padding: 4px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-card);">
                         <span id="progress-count">0</span> events |
                         <span id="progress-time">0:00</span> tagged
                     </div>
-                    <button class="btn btn-ghost" style="width: auto; padding: 6px 12px; border: 1px solid var(--border); font-size: 0.7rem;" id="undo-btn" title="Undo last event (Ctrl+Z)">Undo</button>
-                    <button class="btn btn-ghost" style="width: auto; padding: 6px 12px; border: 1px solid var(--border); font-size: 0.7rem;" id="shortcuts-btn" title="Keyboard shortcuts (?)">Keys [?]</button>
-                    <button class="btn btn-ghost" style="width: auto; padding: 6px 12px; border: 1px solid var(--border); font-size: 0.7rem;" id="toggle-sidebar-btn">Toggle Sidebar</button>
-                    <button class="btn btn-ghost" style="width: auto; padding: 6px 12px; font-size: 0.7rem;" id="back-to-matches">Back</button>
-                    <button class="btn btn-primary" style="width: auto; padding: 6px 16px; background: var(--success); font-size: 0.7rem;" id="finish-match-btn">Finish Match</button>
+                    <button class="btn btn-ghost" style="width: auto; padding: 6px 12px; border: 1px solid var(--border); font-size: 0.8125rem;" id="undo-btn" title="Undo last event (Ctrl+Z)">Undo</button>
+                    <button class="btn btn-ghost" style="width: auto; padding: 6px 12px; border: 1px solid var(--border); font-size: 0.8125rem;" id="shortcuts-btn" title="Keyboard shortcuts (?)">Keys [?]</button>
+                    <button class="btn btn-ghost" style="width: auto; padding: 6px 12px; border: 1px solid var(--border); font-size: 0.8125rem;" id="toggle-sidebar-btn">Toggle Sidebar</button>
+                    <button class="btn btn-ghost" style="width: auto; padding: 6px 12px; font-size: 0.8125rem;" id="back-to-matches">Back</button>
+                    <button class="btn btn-primary" style="width: auto; padding: 6px 16px; background: var(--success); font-size: 0.8125rem;" id="finish-match-btn">Finish Match</button>
                 </div>
             </header>
 
@@ -35,14 +35,14 @@ export function TaggerView() {
                     <!-- Video Source Bar -->
                     <div class="card" style="padding: 12px; flex-shrink: 0;">
                         <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                            <select id="video-source-select" class="form-input" style="width: 120px; padding: 6px 10px; font-size: 0.75rem;">
+                            <select id="video-source-select" class="form-input" style="width: 120px; padding: 6px 10px; font-size: 0.8125rem;">
                                 <option value="youtube">YouTube</option>
                                 <option value="local">Local File</option>
                             </select>
-                            <input type="text" id="video-url-input" class="form-input" style="flex: 1; min-width: 150px; padding: 6px 10px; font-size: 0.75rem;" placeholder="Paste YouTube URL here...">
-                            <button id="load-video-btn" class="btn btn-primary" style="width: auto; padding: 6px 16px; font-size: 0.75rem;">Load</button>
+                            <input type="text" id="video-url-input" class="form-input" style="flex: 1; min-width: 150px; padding: 6px 10px; font-size: 0.8125rem;" placeholder="Paste YouTube URL here...">
+                            <button id="load-video-btn" class="btn btn-primary" style="width: auto; padding: 6px 16px; font-size: 0.8125rem;">Load</button>
                             <input type="file" id="local-video-file" style="display: none;" accept="video/*">
-                            <button id="upload-local-btn" class="btn btn-ghost" style="width: auto; padding: 6px 12px; font-size: 0.75rem; display: none;">Browse</button>
+                            <button id="upload-local-btn" class="btn btn-ghost" style="width: auto; padding: 6px 12px; font-size: 0.8125rem; display: none;">Browse</button>
                         </div>
                     </div>
 
@@ -51,6 +51,7 @@ export function TaggerView() {
                         <div id="video-wrapper" style="aspect-ratio: 16/9; background: #000;">
                             <div id="video-container" style="width: 100%; height: 100%;"></div>
                         </div>
+                        <div id="speed-badge" style="position:absolute;bottom:12px;right:12px;background:rgba(0,0,0,0.75);color:#fff;padding:4px 10px;border-radius:20px;font-family:var(--font-mono);font-size:0.8125rem;font-weight:700;pointer-events:none;z-index:5;">1×</div>
                     </div>
 
                     <!-- Staging Table -->
@@ -58,11 +59,11 @@ export function TaggerView() {
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
                             <h4 style="margin:0;">Event Log</h4>
                             <div style="display: flex; gap: 8px; align-items: center;">
-                                <span id="sync-status" style="font-size: 0.7rem; color: var(--text-muted);"></span>
-                                <button id="sync-btn" class="btn btn-ghost" style="width: auto; padding: 4px 12px; font-size: 0.75rem; color: var(--success);">Sync All</button>
+                                <span id="sync-status" style="font-size: 0.8125rem; color: var(--text-muted);"></span>
+                                <button id="sync-btn" class="btn btn-ghost" style="width: auto; padding: 4px 12px; font-size: 0.8125rem; color: var(--success);">Sync All</button>
                             </div>
                         </div>
-                        <div style="flex-grow: 1; overflow-y: auto; font-size: 0.75rem;">
+                        <div style="flex-grow: 1; overflow-y: auto; font-size: 0.8125rem;">
                             <table style="width: 100%; border-collapse: collapse;">
                                 <thead style="background: var(--primary-light); position: sticky; top: 0;">
                                     <tr>
@@ -139,63 +140,64 @@ export function TaggerView() {
                         </div>
                     </div>
 
-                    <!-- Action Controls -->
-                    <div class="card" style="padding: 20px; flex-shrink: 0;">
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
-                            <div class="form-group">
-                                <label class="form-label">Action</label>
-                                <select id="action-select" class="form-input"></select>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Outcome</label>
-                                <select id="outcome-select" class="form-input"></select>
-                            </div>
+                    <!-- Action Controls — Button Matrix -->
+                    <div class="card" style="padding: 16px; flex-shrink: 0;">
+                        <div class="form-group" style="margin-bottom: 10px;">
+                            <label class="form-label" style="margin-bottom: 6px;">Action <span style="font-size: 0.7rem; color: var(--text-muted);">(hotkey shown)</span></label>
+                            <div id="action-btn-grid" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
                         </div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
-                            <div class="form-group">
-                                <label class="form-label">Type</label>
-                                <select id="type-select" class="form-input"></select>
-                            </div>
-                            <div class="form-group">
+                        <div class="form-group" style="margin-bottom: 10px;">
+                            <label class="form-label" style="margin-bottom: 6px;">Outcome <span style="font-size: 0.7rem; color: var(--text-muted);">[Tab] to cycle</span></label>
+                            <div id="outcome-btn-grid" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 10px;">
+                            <label class="form-label" style="margin-bottom: 6px;">Type</label>
+                            <div id="type-btn-grid" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px;">
+                            <div class="form-group" style="margin-bottom: 0;">
                                 <label class="form-label">Body Part</label>
-                                <select id="body-part-select" class="form-input">
-                                    <option value="Right Leg" selected>Right Leg</option>
-                                    <option value="Left Leg">Left Leg</option>
-                                    <option value="Head">Head</option>
+                                <select id="body-part-select" class="form-input" style="font-size: 0.8125rem;">
+                                    <option value="Right Leg" selected>Right Leg [R]</option>
+                                    <option value="Left Leg">Left Leg [L]</option>
+                                    <option value="Head">Head [H]</option>
                                     <option value="Other">Other</option>
                                     <option value="NA">N/A</option>
                                 </select>
                             </div>
-                        </div>
-                        <div style="margin-bottom: 12px; display: flex; gap: 8px; align-items: center;">
-                            <button id="pressure-btn" class="btn btn-ghost" style="width: auto; flex: 1; border: 1px solid var(--border); padding: 8px;">
-                                Pressure: OFF
+                            <button id="pressure-btn" style="align-self:end;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-md);background:transparent;color:var(--text-main);font-size:0.8125rem;font-weight:600;font-family:inherit;cursor:pointer;">
+                                Pressure: OFF [V]
                             </button>
-                            <button id="direction-btn" class="btn btn-ghost" style="width: auto; flex: 1; border: 1px solid var(--border); padding: 8px;">
+                            <button id="direction-btn" style="align-self:end;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-md);background:transparent;color:var(--text-main);font-size:0.8125rem;font-weight:600;font-family:inherit;cursor:pointer;">
                                 Direct: L2R
                             </button>
                         </div>
-                        <div class="form-group">
-                            <label class="form-label">Notes</label>
-                            <input type="text" id="action-notes" class="form-input" placeholder="Additional details...">
+                        <div class="form-group" style="margin-bottom: 8px;">
+                            <label class="form-label">Notes <span style="font-size: 0.7rem; color: var(--text-muted);">[N] to focus</span></label>
+                            <input type="text" id="action-notes" class="form-input" placeholder="Additional details..." style="font-size: 0.8125rem;">
                         </div>
-                        <button id="add-event-btn" class="btn btn-primary" style="margin-top: 8px;">Log Event [Enter]</button>
+                        <button id="add-event-btn" style="width:100%;padding:14px 20px;border:none;border-radius:var(--radius-md);background:#22c55e;color:white;font-size:1rem;font-weight:800;font-family:inherit;cursor:pointer;letter-spacing:0.02em;transition:all 0.15s ease;">Log Event [Enter]</button>
                     </div>
+
+                    <!-- Hidden selects for internal state (used by JS logic) -->
+                    <select id="action-select" style="display:none;"></select>
+                    <select id="outcome-select" style="display:none;"></select>
+                    <select id="type-select" style="display:none;"></select>
 
                     <!-- Lineup Grid -->
                     <div class="card" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 16px; min-height: 400px; flex-shrink: 0;">
-                        <h4 style="margin-bottom: 12px; margin-top: 0;">Active Players</h4>
+                        <h4 style="margin-bottom: 12px; margin-top: 0;">Active Players <span style="font-size: 0.7rem; color: var(--text-muted);">[1-0] jersey select</span></h4>
                         <div style="flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 20px;">
                             <div>
-                                <div id="home-team-name" style="font-size: 0.75rem; font-weight: 700; color: var(--accent); margin-bottom: 8px; text-transform: uppercase;">HOME TEAM</div>
+                                <div id="home-team-name" style="font-size: 0.8125rem; font-weight: 700; color: var(--accent); margin-bottom: 8px; text-transform: uppercase;">HOME TEAM</div>
                                 <div id="home-player-grid" class="player-grid"></div>
                             </div>
                             <div>
-                                <div id="away-team-name" style="font-size: 0.75rem; font-weight: 700; color: var(--text-main); margin-bottom: 8px; text-transform: uppercase;">AWAY TEAM</div>
+                                <div id="away-team-name" style="font-size: 0.8125rem; font-weight: 700; color: var(--text-main); margin-bottom: 8px; text-transform: uppercase;">AWAY TEAM</div>
                                 <div id="away-player-grid" class="player-grid"></div>
                             </div>
                         </div>
-                        <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 0.8125rem;">
+                        <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 0.875rem;">
                             <div id="selected-players-display">
                                 <div><strong>Action:</strong> <span id="action-player-lbl" style="color:var(--brand);font-weight:600;">None</span></div>
                                 <div style="margin-top: 4px;"><strong>Reaction:</strong> <span id="reaction-player-lbl" style="color:var(--warning);font-weight:600;">None</span></div>
@@ -233,34 +235,46 @@ export function TaggerView() {
                 <button class="btn btn-ghost" onclick="document.getElementById('kickoff-modal').style.display='none'" style="margin-top: 16px; width: 100%;">Cancel Adding Event</button>
             </div>
 
+            <!-- Event Toast -->
+            <div id="event-toast" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:#22c55e;padding:10px 24px;border-radius:var(--radius-lg);font-size:0.875rem;font-weight:600;font-family:inherit;box-shadow:0 8px 24px rgba(0,0,0,0.4);z-index:9999;white-space:nowrap;"></div>
+
             <!-- Keyboard Shortcuts Modal -->
-            <div id="shortcuts-modal" style="display: none; position: fixed; inset: 0; z-index: 5000; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center;">
-                <div class="card" style="width: 500px; max-width: 90vw; max-height: 80vh; overflow-y: auto; padding: 24px; box-shadow: var(--shadow-lg);">
+            <div id="shortcuts-modal" style="display: none; position: fixed; inset: 0; z-index: 5000; background: rgba(0,0,0,0.6); align-items: center; justify-content: center;">
+                <div class="card" style="width: 560px; max-width: 90vw; max-height: 80vh; overflow-y: auto; padding: 24px; box-shadow: var(--shadow-lg);">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                         <h3 style="margin: 0;">Keyboard Shortcuts</h3>
                         <button id="close-shortcuts" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text-muted);">X</button>
                     </div>
-                    <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
-                        <thead>
-                            <tr style="border-bottom:2px solid var(--border);">
-                                <th style="padding:8px;text-align:left;color:var(--text-muted);">Key</th>
-                                <th style="padding:8px;text-align:left;color:var(--text-muted);">Action</th>
-                            </tr>
-                        </thead>
+                    <table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
+                        <thead><tr style="border-bottom:2px solid var(--border);"><th style="padding:8px;text-align:left;color:var(--text-muted);">Key</th><th style="padding:8px;text-align:left;color:var(--text-muted);">Action</th></tr></thead>
                         <tbody>
-                            <tr><td style="padding:6px 8px;"><kbd class="kbd">Space</kbd></td><td style="padding:6px 8px;">Play / Pause video</td></tr>
-                            <tr><td style="padding:6px 8px;"><kbd class="kbd">Arrow Right</kbd></td><td style="padding:6px 8px;">Skip forward 3s</td></tr>
-                            <tr><td style="padding:6px 8px;"><kbd class="kbd">Arrow Left</kbd></td><td style="padding:6px 8px;">Skip backward 3s</td></tr>
-                            <tr><td style="padding:6px 8px;"><kbd class="kbd">Enter</kbd></td><td style="padding:6px 8px;">Log Event</td></tr>
-                            <tr><td style="padding:6px 8px;"><kbd class="kbd">Ctrl+Z</kbd></td><td style="padding:6px 8px;">Undo last event</td></tr>
-                            <tr><td style="padding:6px 8px;"><kbd class="kbd">C</kbd></td><td style="padding:6px 8px;">Set action to Carry</td></tr>
-                            <tr><td style="padding:6px 8px;"><kbd class="kbd">P</kbd></td><td style="padding:6px 8px;">Set action to Pass Intercept</td></tr>
-                            <tr><td style="padding:6px 8px;"><kbd class="kbd">T</kbd></td><td style="padding:6px 8px;">Set action to Through Ball</td></tr>
-                            <tr><td style="padding:6px 8px;"><kbd class="kbd">U</kbd></td><td style="padding:6px 8px;">Set outcome to Missed (for Pass/Through Ball)</td></tr>
-                            <tr><td style="padding:6px 8px;"><kbd class="kbd">V</kbd></td><td style="padding:6px 8px;">Toggle Pressure ON/OFF</td></tr>
-                            <tr><td style="padding:6px 8px;"><kbd class="kbd">L</kbd></td><td style="padding:6px 8px;">Set body part to Left Leg</td></tr>
-                            <tr><td style="padding:6px 8px;"><kbd class="kbd">H</kbd></td><td style="padding:6px 8px;">Set body part to Head</td></tr>
-                            <tr><td style="padding:6px 8px;"><kbd class="kbd">?</kbd> or <kbd class="kbd">F1</kbd></td><td style="padding:6px 8px;">Show this shortcuts overlay</td></tr>
+                            <tr><td colspan="2" style="padding:8px 8px 4px;font-weight:700;color:var(--accent);font-size:0.75rem;text-transform:uppercase;">Video Controls</td></tr>
+                            <tr><td style="padding:5px 8px;"><kbd class="kbd">Space</kbd></td><td style="padding:5px 8px;">Play / Pause</td></tr>
+                            <tr><td style="padding:5px 8px;"><kbd class="kbd">\u2192</kbd> / <kbd class="kbd">\u2190</kbd></td><td style="padding:5px 8px;">Skip \u00b13s</td></tr>
+                            <tr><td style="padding:5px 8px;"><kbd class="kbd">Shift+\u2192</kbd> / <kbd class="kbd">Shift+\u2190</kbd></td><td style="padding:5px 8px;">Skip \u00b110s</td></tr>
+                            <tr><td style="padding:5px 8px;"><kbd class="kbd">Ctrl+\u2192</kbd> / <kbd class="kbd">Ctrl+\u2190</kbd></td><td style="padding:5px 8px;">Frame-by-frame</td></tr>
+                            <tr><td style="padding:5px 8px;"><kbd class="kbd">.</kbd> / <kbd class="kbd">,</kbd></td><td style="padding:5px 8px;">Speed Up / Slow Down</td></tr>
+                            <tr><td colspan="2" style="padding:8px 8px 4px;font-weight:700;color:#22c55e;font-size:0.75rem;text-transform:uppercase;">Attacking</td></tr>
+                            <tr><td style="padding:5px 8px;"><kbd class="kbd">F</kbd></td><td style="padding:5px 8px;">Pass</td></tr>
+                            <tr><td style="padding:5px 8px;"><kbd class="kbd">T</kbd></td><td style="padding:5px 8px;">Through Ball</td></tr>
+                            <tr><td style="padding:5px 8px;"><kbd class="kbd">S</kbd></td><td style="padding:5px 8px;">Shoot</td></tr>
+                            <tr><td style="padding:5px 8px;"><kbd class="kbd">C</kbd></td><td style="padding:5px 8px;">Carry</td></tr>
+                            <tr><td style="padding:5px 8px;"><kbd class="kbd">D</kbd></td><td style="padding:5px 8px;">Dribble</td></tr>
+                            <tr><td colspan="2" style="padding:8px 8px 4px;font-weight:700;color:#ef4444;font-size:0.75rem;text-transform:uppercase;">Defensive</td></tr>
+                            <tr><td style="padding:5px 8px;"><kbd class="kbd">G</kbd></td><td style="padding:5px 8px;">Standing Tackle</td></tr>
+                            <tr><td style="padding:5px 8px;"><kbd class="kbd">P</kbd></td><td style="padding:5px 8px;">Pass Intercept</td></tr>
+                            <tr><td style="padding:5px 8px;"><kbd class="kbd">B</kbd></td><td style="padding:5px 8px;">Block</td></tr>
+                            <tr><td colspan="2" style="padding:8px 8px 4px;font-weight:700;color:var(--text-muted);font-size:0.75rem;text-transform:uppercase;">Modifiers & Events</td></tr>
+                            <tr><td style="padding:5px 8px;"><kbd class="kbd">Tab</kbd> / <kbd class="kbd">Shift+Tab</kbd></td><td style="padding:5px 8px;">Cycle Outcome</td></tr>
+                            <tr><td style="padding:5px 8px;"><kbd class="kbd">U</kbd></td><td style="padding:5px 8px;">Outcome \u2192 Missed</td></tr>
+                            <tr><td style="padding:5px 8px;"><kbd class="kbd">V</kbd></td><td style="padding:5px 8px;">Toggle Pressure</td></tr>
+                            <tr><td style="padding:5px 8px;"><kbd class="kbd">R</kbd> / <kbd class="kbd">L</kbd> / <kbd class="kbd">H</kbd></td><td style="padding:5px 8px;">Body: Right / Left / Head</td></tr>
+                            <tr><td style="padding:5px 8px;"><kbd class="kbd">1</kbd>-<kbd class="kbd">9</kbd>, <kbd class="kbd">0</kbd></td><td style="padding:5px 8px;">Select player by jersey #</td></tr>
+                            <tr><td style="padding:5px 8px;"><kbd class="kbd">N</kbd></td><td style="padding:5px 8px;">Focus Notes</td></tr>
+                            <tr><td style="padding:5px 8px;"><kbd class="kbd">Enter</kbd></td><td style="padding:5px 8px;">Log Event</td></tr>
+                            <tr><td style="padding:5px 8px;"><kbd class="kbd">Ctrl+Z</kbd> / <kbd class="kbd">Ctrl+Shift+Z</kbd></td><td style="padding:5px 8px;">Undo / Redo</td></tr>
+                            <tr><td style="padding:5px 8px;"><kbd class="kbd">Esc</kbd></td><td style="padding:5px 8px;">Blur input</td></tr>
+                            <tr><td style="padding:5px 8px;"><kbd class="kbd">?</kbd> / <kbd class="kbd">F1</kbd></td><td style="padding:5px 8px;">This overlay</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -273,7 +287,8 @@ export function TaggerView() {
                     gap: 6px;
                 }
                 .player-btn {
-                    aspect-ratio: 1;
+                    min-width: 44px;
+                    min-height: 44px;
                     border: 1px solid var(--border);
                     background: var(--primary-light);
                     color: var(--text-main);
@@ -281,17 +296,17 @@ export function TaggerView() {
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    font-size: 0.75rem;
+                    font-size: 0.8125rem;
                     font-weight: 600;
                     cursor: pointer;
-                    transition: all 0.2s ease;
+                    transition: all 0.15s ease;
                 }
                 .player-btn:hover { background: var(--hover-bg); }
                 .player-btn.action-active { background: #22c55e !important; color: white !important; border-color: #22c55e !important; }
                 .player-btn.reaction-active { background: #ef4444 !important; color: white !important; border-color: #ef4444 !important; }
                 .player-btn.disabled { opacity: 0.3; cursor: not-allowed; }
-                .dial-btn { width: 26px; height: 26px; min-width: 26px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 0.65rem; }
-                .kbd { display: inline-block; padding: 2px 8px; background: var(--primary-light); border: 1px solid var(--border); border-radius: 4px; font-family: var(--font-mono); font-size: 0.75rem; font-weight: 700; }
+                .dial-btn { width: 30px; height: 30px; min-width: 30px; min-height: 30px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 0.7rem; }
+                .kbd { display: inline-block; padding: 2px 8px; background: var(--primary-light); border: 1px solid var(--border); border-radius: 4px; font-family: var(--font-mono); font-size: 0.8125rem; font-weight: 700; }
                 .lock-banner { padding: 8px 16px; font-size: 0.8rem; font-weight: 600; text-align: center; border-radius: var(--radius-md); margin-bottom: 4px; }
                 .editable-cell { cursor: pointer; border-bottom: 1px dashed var(--text-muted); }
                 .editable-cell:hover { background: var(--hover-bg); }
@@ -322,6 +337,8 @@ let localEvents = [];
 let undoStack = []; // For undo functionality
 let lockHeartbeatInterval = null;
 let autoSyncPending = false;
+let _lastLogTime = 0; // Debounce for Enter key
+let _toastTimeout = null; // Toast dismissal timer
 let currentState = {
     actionPlayer: null,
     reactionPlayer: null,
@@ -515,6 +532,146 @@ function updateOfflineBanner() {
 }
 
 // ──────────────────────────────────────────
+// BUTTON MATRIX RENDERING
+// ──────────────────────────────────────────
+const ACTION_CATEGORIES = {
+    'Pass': 'atk', 'Through Ball': 'atk', 'Shoot': 'atk', 'Carry': 'atk', 'Dribble': 'atk', 'Ball Control': 'atk',
+    'Standing Tackle': 'def', 'Sliding Tackle': 'def', 'Pass Intercept': 'def', 'Block': 'def', 'Clearance': 'def', 'Save': 'def', 'Pressure': 'def',
+    'Discipline': 'set', 'Substitution': 'meta', 'Match Time': 'meta',
+};
+
+const ACTION_HOTKEYS = {
+    'F': 'Pass', 'T': 'Through Ball', 'S': 'Shoot', 'C': 'Carry', 'D': 'Dribble',
+    'G': 'Standing Tackle', 'P': 'Pass Intercept', 'B': 'Block',
+};
+
+function renderActionButtons() {
+    const grid = document.getElementById('action-btn-grid');
+    const actionSelect = document.getElementById('action-select');
+    if (!grid || !actionSelect) return;
+    grid.innerHTML = '';
+    const reverseHotkeys = {};
+    Object.entries(ACTION_HOTKEYS).forEach(([k, v]) => { reverseHotkeys[v] = k; });
+
+    Array.from(actionSelect.options).forEach(opt => {
+        const btn = document.createElement('button');
+        const cat = ACTION_CATEGORIES[opt.value] || 'meta';
+        const hk = reverseHotkeys[opt.value] || '';
+        btn.type = 'button';
+        btn.setAttribute('data-cat', cat);
+        btn.setAttribute('data-value', opt.value);
+        btn.innerHTML = opt.value + (hk ? `<span style="font-size:0.6rem;opacity:0.5;margin-left:2px;vertical-align:super;">${hk}</span>` : '');
+        btn.style.cssText = 'padding:6px 10px;border:2px solid var(--border);border-radius:var(--radius-md);background:var(--bg-card);color:var(--text-main);font-size:0.75rem;font-weight:600;font-family:inherit;cursor:pointer;transition:all 0.12s ease;white-space:nowrap;';
+        // Color-coded left border
+        const colors = { atk: '#22c55e', def: '#ef4444', set: '#3b82f6', meta: '#6b7280' };
+        btn.style.borderLeft = `3px solid ${colors[cat]}`;
+        if (opt.value === actionSelect.value) {
+            btn.style.background = colors[cat];
+            btn.style.color = 'white';
+            btn.style.borderColor = colors[cat];
+        }
+        btn.addEventListener('click', () => {
+            actionSelect.value = opt.value;
+            actionSelect.dispatchEvent(new Event('change'));
+            renderActionButtons();
+        });
+        grid.appendChild(btn);
+    });
+}
+
+function renderOutcomeButtons() {
+    const grid = document.getElementById('outcome-btn-grid');
+    const outcomeSelect = document.getElementById('outcome-select');
+    if (!grid || !outcomeSelect) return;
+    grid.innerHTML = '';
+    Array.from(outcomeSelect.options).forEach(opt => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = opt.value;
+        btn.setAttribute('data-value', opt.value);
+        btn.style.cssText = 'padding:5px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-card);color:var(--text-main);font-size:0.75rem;font-weight:600;font-family:inherit;cursor:pointer;transition:all 0.12s ease;';
+        if (opt.value === outcomeSelect.value) {
+            btn.style.background = 'var(--accent)';
+            btn.style.color = 'white';
+            btn.style.borderColor = 'var(--accent)';
+        }
+        btn.addEventListener('click', () => {
+            outcomeSelect.value = opt.value;
+            outcomeSelect.dispatchEvent(new Event('change'));
+            renderOutcomeButtons();
+        });
+        grid.appendChild(btn);
+    });
+}
+
+function renderTypeButtons() {
+    const grid = document.getElementById('type-btn-grid');
+    const typeSelect = document.getElementById('type-select');
+    if (!grid || !typeSelect) return;
+    grid.innerHTML = '';
+    Array.from(typeSelect.options).forEach(opt => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = opt.value;
+        btn.setAttribute('data-value', opt.value);
+        btn.style.cssText = 'padding:5px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-card);color:var(--text-main);font-size:0.75rem;font-weight:600;font-family:inherit;cursor:pointer;transition:all 0.12s ease;';
+        if (opt.value === typeSelect.value) {
+            btn.style.background = 'var(--accent)';
+            btn.style.color = 'white';
+            btn.style.borderColor = 'var(--accent)';
+        }
+        btn.addEventListener('click', () => {
+            typeSelect.value = opt.value;
+            typeSelect.dispatchEvent(new Event('change'));
+            renderTypeButtons();
+        });
+        grid.appendChild(btn);
+    });
+}
+
+function renderAllButtonGrids() {
+    renderActionButtons();
+    renderOutcomeButtons();
+    renderTypeButtons();
+}
+
+// ──────────────────────────────────────────
+// TOAST + FLASH
+// ──────────────────────────────────────────
+function showEventToast(message) {
+    const toast = document.getElementById('event-toast');
+    if (!toast) return;
+    if (_toastTimeout) clearTimeout(_toastTimeout);
+    toast.textContent = message;
+    toast.style.display = 'block';
+    toast.style.opacity = '1';
+    _toastTimeout = setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => { toast.style.display = 'none'; }, 300);
+    }, 1800);
+}
+
+function flashLogButton() {
+    const btn = document.getElementById('add-event-btn');
+    if (!btn) return;
+    const orig = btn.style.background;
+    btn.style.background = '#86efac';
+    btn.style.transition = 'none';
+    setTimeout(() => {
+        btn.style.transition = 'background 0.3s ease';
+        btn.style.background = orig || '#22c55e';
+    }, 300);
+}
+
+function updateSpeedBadge() {
+    const badge = document.getElementById('speed-badge');
+    if (!badge || !video) return;
+    const rate = video.getPlaybackRate();
+    badge.textContent = rate === 1 ? '1\u00d7' : rate + '\u00d7';
+    badge.style.opacity = rate === 1 ? '0.5' : '1';
+}
+
+// ──────────────────────────────────────────
 // PROGRESS INDICATOR
 // ──────────────────────────────────────────
 function updateProgress() {
@@ -697,7 +854,8 @@ export async function initTagger() {
         document.getElementById('pitch-coords').innerText = `Start: ${start ? start.x+','+start.y : 'None'} | End: ${end ? end.x+','+end.y : 'None'}`;
         saveSessionState();
 
-        if (e && e.clientX && e.clientY) {
+        // Only show player dial on end-point click (not start-point)
+        if (e && e.clientX && e.clientY && end) {
             const dial = document.getElementById('player-dial');
             dial.style.display = 'block';
 
@@ -775,10 +933,12 @@ export async function initTagger() {
         });
     };
 
-    actionSelect.addEventListener('change', () => { updateOutcomes(); saveSessionState(); });
-    outcomeSelect.addEventListener('change', () => { updateTypes(); saveSessionState(); });
+    actionSelect.addEventListener('change', () => { updateOutcomes(); renderActionButtons(); renderOutcomeButtons(); renderTypeButtons(); saveSessionState(); });
+    outcomeSelect.addEventListener('change', () => { updateTypes(); renderOutcomeButtons(); renderTypeButtons(); saveSessionState(); });
+    typeSelect.addEventListener('change', () => { renderTypeButtons(); saveSessionState(); });
     _restoringSession = true;
     updateOutcomes();
+    renderAllButtonGrids();
 
     // 4. Fetch Lineups
     const { data: lineup, error: lErr } = await supabase
@@ -844,6 +1004,7 @@ export async function initTagger() {
         }
 
         updateLineupState();
+        renderAllButtonGrids();
         directionBtn.innerText = `Direct: ${currentState.homeDirection}`;
 
         _restoringSession = false;
@@ -990,6 +1151,7 @@ function renderPlayerGrids() {
             btn.className = `player-btn p-${p.player_id}`;
             btn.title = `${p.players.player_name} (${p.players.position})`;
             btn.textContent = p.jersey_no;
+            btn.dataset.jersey = p.jersey_no;
             btn.addEventListener('click', () => {
                 window.taggerSelectPlayer(p.player_id, p.team_id, p.players.player_name, p.jersey_no);
             });
@@ -1086,6 +1248,30 @@ function updateLineupState() {
 // HOTKEYS
 // ──────────────────────────────────────────
 function handleHotkeys(e) {
+    // Escape always works — blurs any focused input to restore hotkey mode
+    if (e.key === 'Escape') {
+        e.preventDefault();
+        document.activeElement.blur();
+        return;
+    }
+
+    // Tab/Shift+Tab cycles outcome — intercept before focus trap check
+    if (e.key === 'Tab' && !['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+        e.preventDefault();
+        const outcomeSelect = document.getElementById('outcome-select');
+        if (!outcomeSelect || outcomeSelect.options.length === 0) return;
+        let idx = outcomeSelect.selectedIndex;
+        if (e.shiftKey) {
+            idx = idx <= 0 ? outcomeSelect.options.length - 1 : idx - 1;
+        } else {
+            idx = idx >= outcomeSelect.options.length - 1 ? 0 : idx + 1;
+        }
+        outcomeSelect.selectedIndex = idx;
+        outcomeSelect.dispatchEvent(new Event('change'));
+        renderOutcomeButtons();
+        return;
+    }
+
     if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
 
     const key = e.key.toLowerCase();
@@ -1103,39 +1289,99 @@ function handleHotkeys(e) {
         return;
     }
 
+    // ── Video Controls ──
     if (e.code === 'Space') {
         e.preventDefault();
         video.togglePlay();
     } else if (e.code === 'ArrowRight') {
-        video.seek(video.getCurrentTime() + 3);
+        e.preventDefault();
+        if (e.ctrlKey || e.metaKey) {
+            video.seekRelative(0.04); // Frame-by-frame forward
+        } else if (e.shiftKey) {
+            video.seekRelative(10); // ±10s
+        } else {
+            video.seekRelative(3); // ±3s
+        }
     } else if (e.code === 'ArrowLeft') {
-        video.seek(video.getCurrentTime() - 3);
+        e.preventDefault();
+        if (e.ctrlKey || e.metaKey) {
+            video.seekRelative(-0.04); // Frame-by-frame backward
+        } else if (e.shiftKey) {
+            video.seekRelative(-10);
+        } else {
+            video.seekRelative(-3);
+        }
+    } else if (key === '.') {
+        // Speed up
+        video.cycleSpeedUp();
+        updateSpeedBadge();
+    } else if (key === ',') {
+        // Slow down
+        video.cycleSpeedDown();
+        updateSpeedBadge();
+
+    // ── Log Event (debounced) ──
     } else if (e.code === 'Enter') {
         e.preventDefault();
+        const now = Date.now();
+        if (now - _lastLogTime < 500) return; // Debounce 500ms
+        _lastLogTime = now;
         logEvent();
+
+    // ── Shortcuts Modal ──
     } else if (key === '?' || e.code === 'F1') {
         e.preventDefault();
         toggleShortcutsModal();
+
+    // ── Pressure Toggle ──
     } else if (key === 'v') {
         document.getElementById('pressure-btn').click();
-    } else if (key === 'c') {
-        actionSelect.value = 'Carry';
-        actionSelect.dispatchEvent(new Event('change'));
-    } else if (key === 'p') {
-        actionSelect.value = 'Pass Intercept';
-        actionSelect.dispatchEvent(new Event('change'));
-    } else if (key === 't') {
-        actionSelect.value = 'Through Ball';
-        actionSelect.dispatchEvent(new Event('change'));
+
+    // ── Action Hotkeys ──
+    } else if (ACTION_HOTKEYS[key.toUpperCase()] && actionSelect) {
+        const action = ACTION_HOTKEYS[key.toUpperCase()];
+        if (actionSelect.querySelector(`option[value="${action}"]`)) {
+            actionSelect.value = action;
+            actionSelect.dispatchEvent(new Event('change'));
+            renderActionButtons();
+        }
+
+    // ── Outcome: Missed ──
     } else if (key === 'u') {
-        if (['Pass', 'Through Ball'].includes(actionSelect.value)) {
+        if (actionSelect && ['Pass', 'Through Ball'].includes(actionSelect.value)) {
             outcomeSelect.value = 'Missed';
             outcomeSelect.dispatchEvent(new Event('change'));
+            renderOutcomeButtons();
         }
+
+    // ── Body Part Hotkeys ──
+    } else if (key === 'r') {
+        document.getElementById('body-part-select').value = 'Right Leg';
     } else if (key === 'l') {
         document.getElementById('body-part-select').value = 'Left Leg';
     } else if (key === 'h') {
         document.getElementById('body-part-select').value = 'Head';
+
+    // ── Notes Focus ──
+    } else if (key === 'n') {
+        e.preventDefault();
+        document.getElementById('action-notes')?.focus();
+
+    // ── Player Jersey Hotkeys: 1-9 = jersey 1-9, 0 = jersey 10 ──
+    } else if (/^[0-9]$/.test(key)) {
+        const jersey = key === '0' ? 10 : parseInt(key);
+        selectPlayerByJersey(jersey);
+    }
+}
+
+function selectPlayerByJersey(jersey) {
+    // Find the player button with this jersey number and simulate a click
+    const allBtns = document.querySelectorAll('.player-btn');
+    for (const btn of allBtns) {
+        if (parseInt(btn.dataset.jersey) === jersey) {
+            btn.click();
+            return;
+        }
     }
 }
 
@@ -1265,6 +1511,12 @@ async function logEventWithNote(kickoffNote) {
     updateProgress();
     updateOfflineBanner();
 
+    // Visual feedback: flash + toast
+    const mins = Math.floor(event.match_time_seconds / 60);
+    const secs = (event.match_time_seconds % 60).toString().padStart(2, '0');
+    showEventToast(`\u2713 ${actionVal} \u2192 ${outcome} logged at ${mins}:${secs}`);
+    flashLogButton();
+
     // Auto-advance logic
     const nextStart = pitch.endPoint ? { ...pitch.endPoint } : { ...pitch.startPoint };
     pitch.reset();
@@ -1344,6 +1596,7 @@ async function logEventWithNote(kickoffNote) {
 
     currentState.actionPlayer = nextActionPlayer;
     currentState.reactionPlayer = nextReactionPlayer;
+    renderAllButtonGrids();
     updateLineupState();
 }
 
@@ -1534,7 +1787,7 @@ async function syncEvents() {
         btn.disabled = false;
         if (syncStatus) syncStatus.textContent = 'Sync failed — data safe locally';
     } else {
-        syncedEvents = [...localEvents, ...syncedEvents];
+        syncedEvents = [...localEvents, ...syncedEvents].sort((a, b) => (a.match_time_seconds || 0) - (b.match_time_seconds || 0));
         localEvents = [];
         undoStack = [];
         saveEventsToStorage();

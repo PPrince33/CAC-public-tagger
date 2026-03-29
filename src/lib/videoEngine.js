@@ -6,10 +6,15 @@ export class VideoEngine {
         this.ytPlayer = null;
         this.extWindow = null;
         this.isPip = false;
+        this._currentRate = 1;
         
         // PTZ state
         this.ptzMode = false;
         this.ptz = { scale: 1, x: 0, y: 0, active: false, startX: 0, startY: 0 };
+        
+        // Store bound handlers for cleanup
+        this._ptzMouseMove = null;
+        this._ptzMouseUp = null;
         
         // Build internal structure for PTZ
         this.container.innerHTML = `
@@ -101,6 +106,10 @@ export class VideoEngine {
         else if (this.ytPlayer && typeof this.ytPlayer.seekTo === 'function') this.ytPlayer.seekTo(seconds, true);
     }
 
+    seekRelative(offset) {
+        this.seek(this.getCurrentTime() + offset);
+    }
+
     play() {
         if (this.videoType === 'local' && this.player) {
             this.player.play();
@@ -124,6 +133,49 @@ export class VideoEngine {
             const state = this.ytPlayer.getPlayerState();
             state === 1 ? this.pause() : this.play();
         }
+    }
+
+    // ==========================================
+    // PLAYBACK SPEED CONTROL
+    // ==========================================
+    static SPEED_STEPS = [0.25, 0.5, 1, 1.5, 2];
+
+    setPlaybackRate(rate) {
+        this._currentRate = rate;
+        if (this.videoType === 'local' && this.player) {
+            this.player.playbackRate = rate;
+        } else if (this.ytPlayer && typeof this.ytPlayer.setPlaybackRate === 'function') {
+            this.ytPlayer.setPlaybackRate(rate);
+        }
+    }
+
+    getPlaybackRate() {
+        if (this.videoType === 'local' && this.player) {
+            return this.player.playbackRate;
+        } else if (this.ytPlayer && typeof this.ytPlayer.getPlaybackRate === 'function') {
+            return this.ytPlayer.getPlaybackRate();
+        }
+        return this._currentRate;
+    }
+
+    cycleSpeedUp() {
+        const steps = VideoEngine.SPEED_STEPS;
+        const current = this.getPlaybackRate();
+        let idx = steps.indexOf(current);
+        idx = idx === -1 ? steps.indexOf(1) : idx;
+        const next = steps[Math.min(idx + 1, steps.length - 1)];
+        this.setPlaybackRate(next);
+        return next;
+    }
+
+    cycleSpeedDown() {
+        const steps = VideoEngine.SPEED_STEPS;
+        const current = this.getPlaybackRate();
+        let idx = steps.indexOf(current);
+        idx = idx === -1 ? steps.indexOf(1) : idx;
+        const next = steps[Math.max(idx - 1, 0)];
+        this.setPlaybackRate(next);
+        return next;
     }
 
     // ==========================================
@@ -159,7 +211,7 @@ export class VideoEngine {
             this.ptzOverlay.style.cursor = 'grabbing';
         });
 
-        const handleMouseMove = (e) => {
+        this._ptzMouseMove = (e) => {
             if (this.ptz.active) {
                 this.ptz.x = e.clientX - this.ptz.startX;
                 this.ptz.y = e.clientY - this.ptz.startY;
@@ -167,13 +219,31 @@ export class VideoEngine {
             }
         };
 
-        const handleMouseUp = () => {
+        this._ptzMouseUp = () => {
             this.ptz.active = false;
             this.ptzOverlay.style.cursor = 'grab';
         };
 
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
+        document.addEventListener('mousemove', this._ptzMouseMove);
+        document.addEventListener('mouseup', this._ptzMouseUp);
+    }
+
+    // ==========================================
+    // CLEANUP
+    // ==========================================
+    destroy() {
+        if (this._ptzMouseMove) {
+            document.removeEventListener('mousemove', this._ptzMouseMove);
+            this._ptzMouseMove = null;
+        }
+        if (this._ptzMouseUp) {
+            document.removeEventListener('mouseup', this._ptzMouseUp);
+            this._ptzMouseUp = null;
+        }
+        if (this._onDragMove) {
+            document.removeEventListener('mousemove', this._onDragMove);
+            document.removeEventListener('mouseup', this._onDragEnd);
+        }
     }
 
     // ==========================================

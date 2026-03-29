@@ -21,6 +21,7 @@ class App {
         this.userRole = null;
         this._sessionWarningTimer = null;
         this._sessionExpireTimer = null;
+        this._renderLock = null;
 
         // Global error handling
         window.addEventListener('error', (e) => this.showFatalError(e.message));
@@ -43,6 +44,9 @@ class App {
     }
 
     async init() {
+        window.addEventListener('hashchange', () => this.render());
+
+
         const { data: { session } } = await supabase.auth.getSession();
         await this.handleAuthChange(session?.user ?? null);
 
@@ -56,9 +60,6 @@ class App {
             }
             await this.handleAuthChange(session?.user ?? null);
         });
-
-        window.addEventListener('hashchange', () => this.render());
-        this.render();
     }
 
     // ── Session Timeout Warning ──────────────────────────────
@@ -132,13 +133,23 @@ class App {
         const publicRoutes = ['#login', '#register', '#forgot-password', '#reset-password'];
         if (!user && !publicRoutes.includes(window.location.hash.split('?')[0])) {
             window.location.hash = '#login';
-        } else if (user && publicRoutes.includes(window.location.hash.split('?')[0]) && window.location.hash !== '#reset-password') {
+            return; // hashchange listener will trigger render
+        }
+        if (user && publicRoutes.includes(window.location.hash.split('?')[0]) && window.location.hash !== '#reset-password') {
             window.location.hash = '#create-match';
+            return; // hashchange listener will trigger render
         }
         this.render();
     }
 
-    async render() {
+    render() {
+        this._renderLock = (this._renderLock || Promise.resolve())
+            .then(() => this._doRender())
+            .catch(err => console.error('Render error:', err));
+        return this._renderLock;
+    }
+
+    async _doRender() {
         const hash = window.location.hash || '#create-match';
         const route = router.getRoute(hash);
 
@@ -245,7 +256,7 @@ class App {
             this.setupOfflineDetection();
         }
 
-        if (route.onRender) route.onRender();
+        if (route.onRender) await route.onRender();
     }
 
     setupOfflineDetection() {

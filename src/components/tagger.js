@@ -340,6 +340,7 @@ let autoSyncPending = false;
 let _lastLogTime = 0; // Debounce for Enter key
 let _toastTimeout = null; // Toast dismissal timer
 let _initAbortController = null; // AbortController for cleaning up event listeners on re-init
+let _cachedUser = null; // Cached Supabase user — avoids network call on every logEvent
 let currentState = {
     actionPlayer: null,
     reactionPlayer: null,
@@ -754,6 +755,10 @@ export async function initTagger() {
     // Remove existing listener to prevent accumulation
     document.removeEventListener('keydown', handleHotkeys);
     document.addEventListener('keydown', handleHotkeys);
+
+    // Cache user at init for fast event logging
+    const { data: { user: initUser } } = await supabase.auth.getUser();
+    _cachedUser = initUser;
 
     // Re-render local events IMMEDIATELY so they don't vanish while fetching
     renderStaging();
@@ -1464,7 +1469,13 @@ async function logEventWithNote(kickoffNote) {
         return;
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
+    // Use cached user (fetched at init) — fallback to fresh fetch if cache is stale
+    let user = _cachedUser;
+    if (!user) {
+        const { data } = await supabase.auth.getUser();
+        user = data?.user;
+        _cachedUser = user;
+    }
     if (!user) {
         alert("Session expired. Please log in again.");
         window.location.hash = '#login';

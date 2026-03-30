@@ -8,6 +8,7 @@ let allMatches = [];
 let allTeams = [];
 let allPlayers = [];
 let allUsers = [];
+let allAssignments = {};
 let teamStats = {};
 let playerStats = {};
 let mergeTeamSource = null;
@@ -254,13 +255,14 @@ export async function initAdminPortal() {
    MATCHES
    ────────────────────────────────────────── */
 async function fetchAdminMatches() {
-    const [matchRes, userRes] = await Promise.all([
+    const [matchRes, userRes, assignRes] = await Promise.all([
         supabase.from('matches').select(`
             *, home_team:teams!home_team_id(team_name),
             away_team:teams!away_team_id(team_name),
             creator:profiles!created_by(username)
         `).order('created_at', { ascending: false }),
         supabase.from('profiles').select('id, username, role'),
+        supabase.from('match_assignments').select('match_id, user_id'),
     ]);
 
     if (matchRes.error) {
@@ -269,6 +271,13 @@ async function fetchAdminMatches() {
     }
 
     allUsers = userRes.data || [];
+
+    // Build assignment lookup: match_id -> [user_id, ...]
+    allAssignments = {};
+    (assignRes.data || []).forEach(a => {
+        if (!allAssignments[a.match_id]) allAssignments[a.match_id] = [];
+        allAssignments[a.match_id].push(a.user_id);
+    });
 
     // Paginated fetch for event counts — Supabase limits to 1000 rows
     let allEventRows = [], rangeStart = 0;
@@ -309,15 +318,23 @@ function renderMatchRows() {
         return;
     }
 
-    // Build assign-to dropdown options
-    const userOptions = allUsers.map(u => `<option value="${u.id}">${u.username || 'Unnamed'}</option>`).join('');
-
     tbody.innerHTML = filtered.map(m => {
         const sc = statusStyle(m.status);
         const date = m.match_date ? new Date(m.match_date).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '-';
         const isChecked = selectedMatchIds.has(m.match_id) ? 'checked' : '';
-        const assignedUser = allUsers.find(u => u.id === m.assigned_to);
-        const assignedName = assignedUser?.username || '-';
+        const assignedIds = allAssignments[m.match_id] || [];
+        const assignedNames = assignedIds.map(id => {
+            const u = allUsers.find(u => u.id === id);
+            return u?.username || 'Unknown';
+        }).join(', ') || '-';
+
+        const checkboxOptions = allUsers.map(u => {
+            const checked = assignedIds.includes(u.id) ? 'checked' : '';
+            return `<label style="display: flex; align-items: center; gap: 4px; padding: 2px 0; cursor: pointer; white-space: nowrap;">
+                <input type="checkbox" class="admin-assign-cb" data-match-id="${m.match_id}" data-user-id="${u.id}" ${checked}>
+                <span style="font-size: 0.7rem;">${u.username || 'Unnamed'}</span>
+            </label>`;
+        }).join('');
 
         return `
         <tr>
@@ -326,11 +343,14 @@ function renderMatchRows() {
             <td>${m.homeName}</td>
             <td>${m.awayName}</td>
             <td>${m.creatorName}</td>
-            <td>
-                <select class="assign-select" data-assign-match="${m.match_id}">
-                    <option value="">Unassigned</option>
-                    ${userOptions}
-                </select>
+            <td style="position: relative;">
+                <div class="admin-assign-toggle" data-match-id="${m.match_id}" style="padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; font-size: 0.7rem; min-width: 100px; display: flex; justify-content: space-between; align-items: center;">
+                    <span class="admin-assign-label" data-match-id="${m.match_id}">${assignedIds.length > 0 ? assignedIds.length + ' assigned' : 'Unassigned'}</span>
+                    <span style="font-size: 0.55rem;">▼</span>
+                </div>
+                <div class="admin-assign-menu" data-match-id="${m.match_id}" style="display: none; position: absolute; z-index: 20; background: var(--bg-main); border: 1px solid var(--border); border-radius: 6px; padding: 8px; max-height: 160px; overflow-y: auto; min-width: 150px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+                    ${checkboxOptions}
+                </div>
             </td>
             <td style="white-space: nowrap;">${date}</td>
             <td><span class="admin-status" style="background: ${sc.bg}; color: ${sc.color};">${m.status}</span></td>
@@ -343,7 +363,7 @@ function renderMatchRows() {
         </tr>`;
     }).join('');
 
-    // Checkbox event delegation
+    // Checkbox event delegation for bulk selection
     tbody.querySelectorAll('.match-checkbox').forEach(cb => {
         cb.addEventListener('change', (e) => {
             const matchId = e.target.dataset.matchId;
@@ -356,19 +376,52 @@ function renderMatchRows() {
         });
     });
 
-    // Assign-to dropdowns
-    tbody.querySelectorAll('.assign-select').forEach(sel => {
-        // Set current value
-        const matchId = sel.dataset.assignMatch;
-        const match = allMatches.find(m => m.match_id === matchId);
-        if (match?.assigned_to) sel.value = match.assigned_to;
+    // Toggle assign dropdown menus
+    tbody.querySelectorAll('.admin-assign-toggle').forEach(toggle => {
+        toggle.addEventListener('click', (e) => {
+            const matchId = toggle.dataset.matchId;
+            const menu = tbody.querySelector(`.admin-assign-menu[data-match-id="${matchId}"]`);
+            tbody.querySelectorAll('.admin-assign-menu').forEach(m => {
+                if (m !== menu) m.style.display = 'none';
+            });
+            menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+            e.stopPropagation();
+        });
+    });
 
-        sel.addEventListener('change', async (e) => {
-            const newAssignee = e.target.value || null;
-            const { error } = await supabase.from('matches').update({ assigned_to: newAssignee }).eq('match_id', matchId);
-            if (error) {
-                alert('Failed to assign: ' + error.message);
+    document.addEventListener('click', () => {
+        tbody.querySelectorAll('.admin-assign-menu').forEach(m => m.style.display = 'none');
+    });
+
+    // Handle assignment checkbox changes
+    tbody.querySelectorAll('.admin-assign-cb').forEach(cb => {
+        cb.addEventListener('change', async (e) => {
+            const matchId = e.target.dataset.matchId;
+            const userId = e.target.dataset.userId;
+
+            if (e.target.checked) {
+                const { error } = await supabase.from('match_assignments').insert({ match_id: matchId, user_id: userId });
+                if (error) {
+                    alert('Assignment failed: ' + error.message);
+                    e.target.checked = false;
+                    return;
+                }
+                if (!allAssignments[matchId]) allAssignments[matchId] = [];
+                allAssignments[matchId].push(userId);
+            } else {
+                const { error } = await supabase.from('match_assignments').delete().eq('match_id', matchId).eq('user_id', userId);
+                if (error) {
+                    alert('Unassign failed: ' + error.message);
+                    e.target.checked = true;
+                    return;
+                }
+                allAssignments[matchId] = (allAssignments[matchId] || []).filter(id => id !== userId);
             }
+
+            // Update label
+            const count = (allAssignments[matchId] || []).length;
+            const label = tbody.querySelector(`.admin-assign-label[data-match-id="${matchId}"]`);
+            if (label) label.textContent = count > 0 ? count + ' assigned' : 'Unassigned';
         });
     });
 }

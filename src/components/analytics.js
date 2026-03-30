@@ -111,17 +111,22 @@ export async function initAnalytics() {
             ]);
         } else {
             // Analyst sees only their own matches and events — paginated
-            [matches, events, profiles] = await Promise.all([
+            let myAssignments;
+            [matches, events, profiles, myAssignments] = await Promise.all([
                 fetchAll(supabase.from('matches')
-                    .select('match_id, created_by, created_at, status, assigned_to')
-                    .or(`created_by.eq.${user.id},assigned_to.eq.${user.id}`)),
+                    .select('match_id, created_by, created_at, status')),
                 fetchAll(supabase.from('match_events')
                     .select('event_id, match_id, analyst_id, action, created_at')
                     .eq('analyst_id', user.id)),
                 fetchAll(supabase.from('profiles')
                     .select('id, username, role')
                     .eq('id', user.id)),
+                fetchAll(supabase.from('match_assignments')
+                    .select('match_id')
+                    .eq('user_id', user.id)),
             ]);
+            const assignedMatchIds = new Set(myAssignments.map(a => a.match_id));
+            matches = matches.filter(m => m.created_by === user.id || assignedMatchIds.has(m.match_id));
         }
 
         // Summary stats

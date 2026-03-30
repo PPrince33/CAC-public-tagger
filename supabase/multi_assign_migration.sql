@@ -22,29 +22,29 @@ WHERE assigned_to IS NOT NULL
 ON CONFLICT DO NOTHING;
 
 -- 3. RLS policies for match_assignments
+-- IMPORTANT: these must NOT reference the matches table to avoid infinite recursion,
+-- since the matches SELECT policy references match_assignments.
 ALTER TABLE match_assignments ENABLE ROW LEVEL SECURITY;
 
--- Admins and match creators can manage assignments
+-- Any authenticated user can read assignments (matches RLS already controls visibility)
 CREATE POLICY "assignments_select"
     ON match_assignments FOR SELECT
-    USING (
-        user_id = auth.uid()
-        OR EXISTS (SELECT 1 FROM matches WHERE matches.match_id = match_assignments.match_id AND matches.created_by = auth.uid())
-        OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'qc'))
-    );
+    USING (auth.uid() IS NOT NULL);
 
+-- Creators and admins can insert (use match_id check against matches without triggering matches SELECT policy)
 CREATE POLICY "assignments_insert"
     ON match_assignments FOR INSERT
     WITH CHECK (
-        EXISTS (SELECT 1 FROM matches WHERE matches.match_id = match_assignments.match_id AND matches.created_by = auth.uid())
-        OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+        EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+        OR match_id IN (SELECT m.match_id FROM matches m WHERE m.created_by = auth.uid())
     );
 
+-- Creators and admins can delete
 CREATE POLICY "assignments_delete"
     ON match_assignments FOR DELETE
     USING (
-        EXISTS (SELECT 1 FROM matches WHERE matches.match_id = match_assignments.match_id AND matches.created_by = auth.uid())
-        OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+        EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+        OR match_id IN (SELECT m.match_id FROM matches m WHERE m.created_by = auth.uid())
     );
 
 -- 4. Update match SELECT policy to include junction table

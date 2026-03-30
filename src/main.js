@@ -109,11 +109,16 @@ class App {
     }
 
     async handleAuthChange(user) {
+        // Skip if same user and role already fetched
+        if (user && this.user?.id === user.id && this.userRole) {
+            return;
+        }
+
         this.user = user;
-        this.userRole = null;
 
         if (user) {
-            // Fetch role with retry on failure
+            // Fetch role with retry — don't reset to null first so stale role
+            // is better than no role during concurrent calls
             for (let attempt = 0; attempt < 2; attempt++) {
                 try {
                     const { data: profile, error } = await supabase
@@ -126,23 +131,22 @@ class App {
                     break;
                 } catch (e) {
                     console.warn(`Role fetch attempt ${attempt + 1} failed:`, e.message);
-                    if (attempt === 1) this.userRole = 'analyst';
+                    if (attempt === 1) this.userRole = this.userRole || 'analyst';
                 }
             }
             this.resetSessionTimers();
         } else {
+            this.userRole = null;
             clearTimeout(this._sessionWarningTimer);
             clearTimeout(this._sessionExpireTimer);
         }
 
+        // Redirect if needed, then always render
         const publicRoutes = ['#login', '#register', '#forgot-password', '#reset-password'];
         if (!user && !publicRoutes.includes(window.location.hash.split('?')[0])) {
             window.location.hash = '#login';
-            return; // hashchange listener will trigger render
-        }
-        if (user && publicRoutes.includes(window.location.hash.split('?')[0]) && window.location.hash !== '#reset-password') {
+        } else if (user && publicRoutes.includes(window.location.hash.split('?')[0]) && window.location.hash !== '#reset-password') {
             window.location.hash = '#create-match';
-            return; // hashchange listener will trigger render
         }
         this.render();
     }

@@ -206,11 +206,11 @@ export function AdminPortalView() {
                 </div>
 
                 <!-- OTP Modal -->
-                <div id="flow-otp-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; display: none; align-items: center; justify-content: center;">
+                <div id="flow-otp-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; align-items: center; justify-content: center;">
                     <div style="background: var(--bg-card); padding: 32px; border-radius: var(--radius-xl); max-width: 400px; width: 90%; box-shadow: 0 8px 32px rgba(0,0,0,0.2);">
-                        <h3 style="margin-bottom: 8px;">Verify to Save</h3>
-                        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 20px;">A 6-digit verification code has been sent to your email. Enter it below to confirm changes.</p>
-                        <input id="flow-otp-input" class="form-input" type="text" placeholder="Enter 6-digit code" maxlength="6" style="text-align: center; font-size: 1.25rem; letter-spacing: 8px; font-weight: 700;">
+                        <h3 style="margin-bottom: 8px;">Enter Password to Save</h3>
+                        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 20px;">Enter your admin login password to confirm changes.</p>
+                        <input id="flow-otp-input" class="form-input" type="password" placeholder="Enter your password" style="font-size: 1rem; font-weight: 500;">
                         <div id="flow-otp-error" style="color: var(--danger); font-size: 0.8rem; margin-top: 8px; display: none;"></div>
                         <div style="display: flex; gap: 8px; margin-top: 20px;">
                             <button id="flow-otp-cancel" class="btn btn-ghost" style="flex: 1;">Cancel</button>
@@ -1018,25 +1018,9 @@ async function handleFlowSave() {
         return;
     }
 
-    // Send OTP to admin's email
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user?.email) {
-        showFlowStatus('Could not get your email for verification.', 'var(--danger)');
-        return;
-    }
-
-    showFlowStatus('Sending verification code to ' + user.email + '...', 'var(--text-muted)');
-
-    const { error } = await supabase.auth.signInWithOtp({ email: user.email });
-    if (error) {
-        showFlowStatus('Failed to send OTP: ' + error.message, 'var(--danger)');
-        return;
-    }
-
     pendingFlowEdits = { ...flowEdits };
-    showFlowStatus('Verification code sent! Check your email.', 'var(--success)');
 
-    // Show OTP modal
+    // Show password modal
     document.getElementById('flow-otp-modal').style.display = 'flex';
     document.getElementById('flow-otp-input').value = '';
     document.getElementById('flow-otp-error').style.display = 'none';
@@ -1046,30 +1030,29 @@ async function handleFlowSave() {
 async function handleFlowOTPConfirm() {
     const otpInput = document.getElementById('flow-otp-input');
     const otpError = document.getElementById('flow-otp-error');
-    const code = otpInput.value.trim();
+    const password = otpInput.value.trim();
 
-    if (!code || code.length !== 6) {
-        otpError.textContent = 'Please enter the 6-digit code.';
+    if (!password) {
+        otpError.textContent = 'Please enter your password.';
         otpError.style.display = 'block';
         return;
     }
 
     const { data: { user } } = await supabase.auth.getUser();
 
-    // Verify OTP
-    const { error: verifyError } = await supabase.auth.verifyOtp({
+    // Verify admin password
+    const { error: verifyError } = await supabase.auth.signInWithPassword({
         email: user.email,
-        token: code,
-        type: 'email',
+        password: password,
     });
 
     if (verifyError) {
-        otpError.textContent = 'Invalid or expired code. Please try again.';
+        otpError.textContent = 'Incorrect password. Please try again.';
         otpError.style.display = 'block';
         return;
     }
 
-    // OTP verified — save all edits
+    // Password verified — save all edits
     document.getElementById('flow-otp-modal').style.display = 'none';
     showFlowStatus('Saving changes...', 'var(--text-muted)');
 

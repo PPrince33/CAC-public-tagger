@@ -1,6 +1,6 @@
 import { supabase } from '../supabase'
 import { CAC_LOGIC, ACTION_RULES } from '../lib/cacLogic'
-import { getNextEntry } from '../lib/actionFlow'
+import { getNextEntry, loadFlowRules } from '../lib/actionFlow'
 import { PitchCanvas } from '../lib/pitchCanvas'
 import { GoalFaceCanvas } from '../lib/goalFace'
 import { VideoEngine } from '../lib/videoEngine'
@@ -728,6 +728,9 @@ function redoLastEvent() {
 // INIT TAGGER
 // ──────────────────────────────────────────
 export async function initTagger() {
+    // Load action flow rules from DB (non-blocking — falls back to static)
+    loadFlowRules();
+
     // Maximize viewport for Tagger specifically
     const mainView = document.getElementById('main-view');
     if (mainView) {

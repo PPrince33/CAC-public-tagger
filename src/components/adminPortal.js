@@ -1,5 +1,6 @@
 import { supabase } from '../supabase'
 import { exportToExcel, exportToCSV } from '../lib/excelExport'
+import { CAC_LOGIC } from '../lib/cacLogic'
 
 /* ──────────────────────────────────────────
    MODULE STATE
@@ -9,6 +10,8 @@ let allTeams = [];
 let allPlayers = [];
 let allUsers = [];
 let allAssignments = {};
+let flowRules = [];
+let flowEdits = {};
 let teamStats = {};
 let playerStats = {};
 let mergeTeamSource = null;
@@ -75,6 +78,7 @@ export function AdminPortalView() {
             <button class="admin-tab" data-tab="users">Users</button>
             <button class="admin-tab" data-tab="teams">Merge Teams</button>
             <button class="admin-tab" data-tab="players">Merge Players</button>
+            <button class="admin-tab" data-tab="actionflow">Action Flow</button>
         </div>
 
         <!-- MATCHES TAB -->
@@ -186,6 +190,58 @@ export function AdminPortalView() {
                 <button id="btn-merge-players" class="btn btn-primary" style="background: var(--warning); color: black; margin-top: 8px;" disabled>Merge Players</button>
             </div>
         </section>
+
+        <!-- ACTION FLOW TAB -->
+        <section id="admin-tab-actionflow" class="admin-section">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
+                    <div>
+                        <h3 style="margin: 0;">Action Flow Rules</h3>
+                        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Define what the next entry should be based on the current action, outcome, and type. Changes affect the tagger for all analysts.</p>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input id="flow-search" class="form-input admin-search" style="width: 220px; margin: 0;" type="text" placeholder="Filter by action...">
+                        <button id="btn-save-flow" class="btn btn-primary" style="width: auto; padding: 8px 24px;">Save Changes</button>
+                    </div>
+                </div>
+
+                <!-- OTP Modal -->
+                <div id="flow-otp-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; display: none; align-items: center; justify-content: center;">
+                    <div style="background: var(--bg-card); padding: 32px; border-radius: var(--radius-xl); max-width: 400px; width: 90%; box-shadow: 0 8px 32px rgba(0,0,0,0.2);">
+                        <h3 style="margin-bottom: 8px;">Verify to Save</h3>
+                        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 20px;">A 6-digit verification code has been sent to your email. Enter it below to confirm changes.</p>
+                        <input id="flow-otp-input" class="form-input" type="text" placeholder="Enter 6-digit code" maxlength="6" style="text-align: center; font-size: 1.25rem; letter-spacing: 8px; font-weight: 700;">
+                        <div id="flow-otp-error" style="color: var(--danger); font-size: 0.8rem; margin-top: 8px; display: none;"></div>
+                        <div style="display: flex; gap: 8px; margin-top: 20px;">
+                            <button id="flow-otp-cancel" class="btn btn-ghost" style="flex: 1;">Cancel</button>
+                            <button id="flow-otp-confirm" class="btn btn-primary" style="flex: 1;">Confirm Save</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="flow-status" style="display: none; padding: 10px 16px; border-radius: var(--radius-md); margin-bottom: 12px; font-size: 0.8rem;"></div>
+
+                <div style="overflow-x: auto; max-height: 70vh; overflow-y: auto;">
+                    <table class="admin-table" id="flow-rules-table">
+                        <thead style="position: sticky; top: 0; z-index: 2;">
+                            <tr>
+                                <th style="background: var(--warning); color: black;">Current Action</th>
+                                <th style="background: var(--warning); color: black;">Current Outcome</th>
+                                <th style="background: var(--warning); color: black;">Current Type</th>
+                                <th style="background: var(--accent); color: white;">Next Action</th>
+                                <th style="background: var(--accent); color: white;">Next Outcome</th>
+                                <th style="background: var(--accent); color: white;">Next Type</th>
+                                <th style="background: var(--accent); color: white;">Next Action Player</th>
+                                <th style="background: var(--accent); color: white;">Next Reaction Player</th>
+                            </tr>
+                        </thead>
+                        <tbody id="flow-rules-tbody">
+                            <tr><td colspan="8" style="text-align: center; padding: 40px; color: var(--text-muted);">Loading flow rules...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
     </div>
     `;
 }
@@ -210,6 +266,7 @@ export async function initAdminPortal() {
         fetchAdminUsers(),
         fetchTeamMergeData(),
         fetchPlayerMergeData(),
+        fetchFlowRules(),
     ]);
 
     // Search handlers
@@ -249,6 +306,14 @@ export async function initAdminPortal() {
         renderMatchRows();
         updateBulkBar();
     });
+
+    // Action Flow handlers
+    document.getElementById('flow-search')?.addEventListener('input', renderFlowTable);
+    document.getElementById('btn-save-flow')?.addEventListener('click', handleFlowSave);
+    document.getElementById('flow-otp-cancel')?.addEventListener('click', () => {
+        document.getElementById('flow-otp-modal').style.display = 'none';
+    });
+    document.getElementById('flow-otp-confirm')?.addEventListener('click', handleFlowOTPConfirm);
 }
 
 /* ──────────────────────────────────────────
@@ -809,5 +874,242 @@ async function handleMerge(type) {
         if (isTeam) await fetchTeamMergeData();
         else await fetchPlayerMergeData();
         await fetchAdminMatches();
+    }
+}
+
+/* ──────────────────────────────────────────
+   ACTION FLOW RULES
+   ────────────────────────────────────────── */
+
+// All possible actions and their outcomes/types from CAC_LOGIC
+const ALL_ACTIONS = Object.keys(CAC_LOGIC);
+
+function buildActionOptions(selected) {
+    return ALL_ACTIONS.map(a => `<option value="${a}" ${a === selected ? 'selected' : ''}>${a}</option>`).join('');
+}
+
+function buildOutcomeOptions(action, selected) {
+    const outcomes = action && CAC_LOGIC[action] ? Object.keys(CAC_LOGIC[action]) : [];
+    return `<option value="">—</option>` + outcomes.map(o => `<option value="${o}" ${o === selected ? 'selected' : ''}>${o}</option>`).join('');
+}
+
+function buildTypeOptions(action, outcome, selected) {
+    const types = (action && outcome && CAC_LOGIC[action]?.[outcome]) || [];
+    return `<option value="">—</option>` + types.map(t => `<option value="${t}" ${t === selected ? 'selected' : ''}>${t}</option>`).join('');
+}
+
+const PLAYER_OPTIONS = [
+    { value: '', label: '— None (clear)' },
+    { value: 'prevAction', label: 'Current Action Player' },
+    { value: 'prevReaction', label: 'Current Reaction Player' },
+    { value: 'prevReaction_or_prevAction', label: 'Reaction (or Action fallback)' },
+];
+
+function buildPlayerOptions(selected) {
+    return PLAYER_OPTIONS.map(o => `<option value="${o.value}" ${(selected || '') === o.value ? 'selected' : ''}>${o.label}</option>`).join('');
+}
+
+async function fetchFlowRules() {
+    const { data, error } = await supabase.from('action_flow_rules').select('*').order('current_action').order('current_outcome').order('current_type');
+    if (error) {
+        console.error('Failed to fetch flow rules:', error);
+        flowRules = [];
+    } else {
+        flowRules = data || [];
+    }
+    flowEdits = {};
+    renderFlowTable();
+}
+
+function renderFlowTable() {
+    const tbody = document.getElementById('flow-rules-tbody');
+    if (!tbody) return;
+    const q = (document.getElementById('flow-search')?.value || '').toLowerCase();
+
+    const filtered = q ? flowRules.filter(r =>
+        r.current_action.toLowerCase().includes(q) ||
+        (r.current_outcome || '').toLowerCase().includes(q)
+    ) : flowRules;
+
+    if (!filtered.length) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 40px; color: var(--text-muted);">${q ? 'No matching rules.' : 'No flow rules found. Run the migration to seed them.'}</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = filtered.map(r => {
+        const edited = flowEdits[r.id];
+        const bg = edited ? 'background: var(--row-selected);' : '';
+        return `
+        <tr style="${bg}" data-rule-id="${r.id}">
+            <td style="font-weight: 600;">${r.current_action}</td>
+            <td>${r.current_outcome}</td>
+            <td style="color: var(--text-muted);">${r.current_type || '—'}</td>
+            <td>
+                <select class="flow-edit" data-field="next_action" data-id="${r.id}" style="font-size: 0.7rem; padding: 3px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-input); color: var(--text-main); font-family: inherit;">
+                    ${buildActionOptions(edited?.next_action ?? r.next_action)}
+                </select>
+            </td>
+            <td>
+                <select class="flow-edit" data-field="next_outcome" data-id="${r.id}" style="font-size: 0.7rem; padding: 3px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-input); color: var(--text-main); font-family: inherit;">
+                    ${buildOutcomeOptions(edited?.next_action ?? r.next_action, edited?.next_outcome ?? r.next_outcome)}
+                </select>
+            </td>
+            <td>
+                <select class="flow-edit" data-field="next_type" data-id="${r.id}" style="font-size: 0.7rem; padding: 3px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-input); color: var(--text-main); font-family: inherit;">
+                    ${buildTypeOptions(edited?.next_action ?? r.next_action, edited?.next_outcome ?? r.next_outcome, edited?.next_type ?? r.next_type)}
+                </select>
+            </td>
+            <td>
+                <select class="flow-edit" data-field="next_action_player" data-id="${r.id}" style="font-size: 0.7rem; padding: 3px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-input); color: var(--text-main); font-family: inherit;">
+                    ${buildPlayerOptions(edited?.next_action_player ?? r.next_action_player)}
+                </select>
+            </td>
+            <td>
+                <select class="flow-edit" data-field="next_reaction_player" data-id="${r.id}" style="font-size: 0.7rem; padding: 3px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-input); color: var(--text-main); font-family: inherit;">
+                    ${buildPlayerOptions(edited?.next_reaction_player ?? r.next_reaction_player)}
+                </select>
+            </td>
+        </tr>`;
+    }).join('');
+
+    // Listen for edits
+    tbody.querySelectorAll('.flow-edit').forEach(sel => {
+        sel.addEventListener('change', (e) => {
+            const id = parseInt(e.target.dataset.id);
+            const field = e.target.dataset.field;
+            const value = e.target.value;
+            const rule = flowRules.find(r => r.id === id);
+            if (!rule) return;
+
+            if (!flowEdits[id]) {
+                flowEdits[id] = {
+                    next_action: rule.next_action,
+                    next_outcome: rule.next_outcome,
+                    next_type: rule.next_type,
+                    next_action_player: rule.next_action_player,
+                    next_reaction_player: rule.next_reaction_player,
+                };
+            }
+            flowEdits[id][field] = value || null;
+
+            // If next_action changed, re-render outcomes/types for this row
+            if (field === 'next_action') {
+                flowEdits[id].next_outcome = null;
+                flowEdits[id].next_type = null;
+                renderFlowTable();
+            } else if (field === 'next_outcome') {
+                flowEdits[id].next_type = null;
+                renderFlowTable();
+            }
+
+            // Highlight edited row
+            const row = tbody.querySelector(`tr[data-rule-id="${id}"]`);
+            if (row) row.style.background = 'var(--row-selected)';
+        });
+    });
+}
+
+let pendingFlowEdits = null;
+
+async function handleFlowSave() {
+    const editIds = Object.keys(flowEdits);
+    if (editIds.length === 0) {
+        showFlowStatus('No changes to save.', 'var(--text-muted)');
+        return;
+    }
+
+    // Send OTP to admin's email
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user?.email) {
+        showFlowStatus('Could not get your email for verification.', 'var(--danger)');
+        return;
+    }
+
+    showFlowStatus('Sending verification code to ' + user.email + '...', 'var(--text-muted)');
+
+    const { error } = await supabase.auth.signInWithOtp({ email: user.email });
+    if (error) {
+        showFlowStatus('Failed to send OTP: ' + error.message, 'var(--danger)');
+        return;
+    }
+
+    pendingFlowEdits = { ...flowEdits };
+    showFlowStatus('Verification code sent! Check your email.', 'var(--success)');
+
+    // Show OTP modal
+    document.getElementById('flow-otp-modal').style.display = 'flex';
+    document.getElementById('flow-otp-input').value = '';
+    document.getElementById('flow-otp-error').style.display = 'none';
+    document.getElementById('flow-otp-input').focus();
+}
+
+async function handleFlowOTPConfirm() {
+    const otpInput = document.getElementById('flow-otp-input');
+    const otpError = document.getElementById('flow-otp-error');
+    const code = otpInput.value.trim();
+
+    if (!code || code.length !== 6) {
+        otpError.textContent = 'Please enter the 6-digit code.';
+        otpError.style.display = 'block';
+        return;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+
+    // Verify OTP
+    const { error: verifyError } = await supabase.auth.verifyOtp({
+        email: user.email,
+        token: code,
+        type: 'email',
+    });
+
+    if (verifyError) {
+        otpError.textContent = 'Invalid or expired code. Please try again.';
+        otpError.style.display = 'block';
+        return;
+    }
+
+    // OTP verified — save all edits
+    document.getElementById('flow-otp-modal').style.display = 'none';
+    showFlowStatus('Saving changes...', 'var(--text-muted)');
+
+    let saveCount = 0;
+    let errorMsg = null;
+
+    for (const [id, edits] of Object.entries(pendingFlowEdits)) {
+        const { error } = await supabase.from('action_flow_rules').update({
+            next_action: edits.next_action,
+            next_outcome: edits.next_outcome,
+            next_type: edits.next_type,
+            next_action_player: edits.next_action_player || null,
+            next_reaction_player: edits.next_reaction_player || null,
+            updated_at: new Date().toISOString(),
+            updated_by: user.id,
+        }).eq('id', parseInt(id));
+
+        if (error) {
+            errorMsg = error.message;
+            break;
+        }
+        saveCount++;
+    }
+
+    if (errorMsg) {
+        showFlowStatus(`Error after saving ${saveCount} rules: ${errorMsg}`, 'var(--danger)');
+    } else {
+        showFlowStatus(`Saved ${saveCount} rule(s) successfully!`, 'var(--success)');
+        pendingFlowEdits = null;
+        await fetchFlowRules();
+    }
+}
+
+function showFlowStatus(msg, color) {
+    const el = document.getElementById('flow-status');
+    if (!el) return;
+    el.textContent = msg;
+    el.style.color = color;
+    el.style.display = 'block';
+    if (color === 'var(--success)' || color === 'var(--text-muted)') {
+        setTimeout(() => { el.style.display = 'none'; }, 4000);
     }
 }

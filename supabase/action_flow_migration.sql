@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS public.action_flow_rules (
     next_action TEXT NOT NULL DEFAULT 'Pass',
     next_outcome TEXT,
     next_type TEXT,
-    next_action_player TEXT NOT NULL DEFAULT 'prevReaction_or_prevAction',
+    next_action_player TEXT,
     next_reaction_player TEXT,
     updated_at TIMESTAMPTZ DEFAULT now(),
     updated_by UUID REFERENCES auth.users(id),

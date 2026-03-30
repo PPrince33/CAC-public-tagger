@@ -1,5 +1,6 @@
 import { supabase } from '../supabase'
 import { CAC_LOGIC, ACTION_RULES } from '../lib/cacLogic'
+import { getNextEntry } from '../lib/actionFlow'
 import { PitchCanvas } from '../lib/pitchCanvas'
 import { GoalFaceCanvas } from '../lib/goalFace'
 import { VideoEngine } from '../lib/videoEngine'
@@ -1547,69 +1548,34 @@ async function logEventWithNote(kickoffNote) {
     document.getElementById('first-time-shot-select').value = '0';
     document.getElementById('assist-type-select').value = 'Normal Pass';
 
-    // Save previous state for auto-suggestion
+    // Auto-suggest next entry from actionFlow config
     const prevAction = actionVal;
     const prevOutcome = document.getElementById('outcome-select').value;
     const prevType = document.getElementById('type-select').value;
     const prevActionPlayer = currentState.actionPlayer ? { ...currentState.actionPlayer } : null;
     const prevReactionPlayer = currentState.reactionPlayer ? { ...currentState.reactionPlayer } : null;
 
-    let nextAction = 'Pass';
-    let nextOutcome = 'Successful';
-    let nextType = null;
-    let nextActionPlayer = null;
-    let nextReactionPlayer = null;
-
-    const isTackle = prevAction === 'Standing Tackle' || prevAction === 'Sliding Tackle';
-
-    if ((prevAction === 'Pass' || prevAction === 'Through Ball') && prevOutcome === 'Intercepted') {
-        nextAction = 'Pass Intercept';
-        nextOutcome = null;
-        nextActionPlayer = null;
-        nextReactionPlayer = prevActionPlayer;
-    } else if (prevAction === 'Shoot' && prevOutcome === 'Save') {
-        nextAction = 'Save';
-        nextOutcome = null;
-        nextActionPlayer = prevReactionPlayer;
-        nextReactionPlayer = prevActionPlayer;
-    } else if (prevAction === 'Shoot' && prevOutcome === 'Block') {
-        nextAction = 'Block';
-        nextOutcome = null;
-        nextActionPlayer = prevReactionPlayer;
-        nextReactionPlayer = prevActionPlayer;
-    } else if (isTackle && prevOutcome === 'Successful' && prevType === 'With Possession') {
-        nextActionPlayer = prevActionPlayer;
-    } else if (isTackle && prevOutcome === 'Successful' && prevType === 'Without Possession') {
-        nextActionPlayer = null;
-    } else if (isTackle && prevOutcome === 'Unsuccessful') {
-        nextActionPlayer = null;
-    } else {
-        if (prevReactionPlayer) {
-            nextActionPlayer = prevReactionPlayer;
-        } else {
-            nextActionPlayer = prevActionPlayer;
-        }
-    }
+    const next = getNextEntry(prevAction, prevOutcome, prevType, prevActionPlayer, prevReactionPlayer);
 
     const actionSelect = document.getElementById('action-select');
-    actionSelect.value = nextAction;
+    actionSelect.value = next.action;
     actionSelect.dispatchEvent(new Event('change'));
 
     const outcomeSelect = document.getElementById('outcome-select');
-    if (nextOutcome && outcomeSelect.querySelector(`option[value="${nextOutcome}"]`)) {
-        outcomeSelect.value = nextOutcome;
+    if (next.outcome && outcomeSelect.querySelector(`option[value="${next.outcome}"]`)) {
+        outcomeSelect.value = next.outcome;
         outcomeSelect.dispatchEvent(new Event('change'));
     }
 
     const typeSelect = document.getElementById('type-select');
-    if (nextType && typeSelect.querySelector(`option[value="${nextType}"]`)) {
-        typeSelect.value = nextType;
+    if (next.type && typeSelect.querySelector(`option[value="${next.type}"]`)) {
+        typeSelect.value = next.type;
     }
 
     document.getElementById('body-part-select').value = 'Right Leg';
 
-    currentState.actionPlayer = nextActionPlayer;
-    currentState.reactionPlayer = nextReactionPlayer;
+    currentState.actionPlayer = next.actionPlayer;
+    currentState.reactionPlayer = next.reactionPlayer;
     updateLineupState();
 }
 

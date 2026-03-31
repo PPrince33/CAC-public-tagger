@@ -164,6 +164,7 @@ export function QCPortalView() {
                 <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 12px;">
                     <span style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted); margin-right: 4px;">QUICK:</span>
                     <button class="qc-quick-btn" data-filter="Shoot">Shoot</button>
+                    <button class="qc-quick-btn" data-filter="Goal">Goal</button>
                     <button class="qc-quick-btn" data-filter="Assist">Assist</button>
                     <button class="qc-quick-btn" data-filter="Key Pass">Key Pass</button>
                     <button class="qc-quick-btn" data-filter="Corner Kick">Corner Kick</button>
@@ -629,6 +630,7 @@ function renderLogTable() {
             const a = ev.Action || '', o = ev.Action_Outcome || '', s = ev.Sub_Action_Outcome || '';
             switch (activeQuickFilter) {
                 case 'Shoot': m = a === 'Shoot'; break;
+                case 'Goal': m = o === 'Goal' || s === 'Own Goal' || o === 'Own Goal'; break;
                 case 'Assist': m = o === 'Assist' || s === 'Assist'; break;
                 case 'Key Pass': m = o === 'Key Pass' || s === 'Key Pass'; break;
                 case 'Corner Kick': m = o === 'Corner Kick' || s === 'Corner Kick'; break;

@@ -5,7 +5,7 @@ export function MatchesView() {
         <div class="fade-in">
             <header class="page-header">
                 <h1 class="page-title">My Matches</h1>
-                <p class="page-subtitle">Matches you created or were assigned to tag</p>
+                <p class="page-subtitle">All matches in your academy</p>
             </header>
 
             <div id="matches-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 24px;">
@@ -22,23 +22,43 @@ export async function initMatches() {
 
     try {
         const { data: { user } } = await supabase.auth.getUser();
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role, academy_id')
+            .eq('id', user.id)
+            .single();
+        const isSuperAdmin = profile?.role === 'super_admin';
+        const myAcademyId = profile?.academy_id || null;
 
-        // Fetch matches, analysts, and assignments in parallel
+        // Build the matches query — academy-scoped for analysts, all for super_admin
+        // (RLS also enforces this on the server side)
+        let matchesQuery = supabase
+            .from('matches')
+            .select(`
+                match_id, match_name, match_date, status, video_url, locked_by, locked_at, created_by, academy_id,
+                home_team:teams!home_team_id(team_name),
+                away_team:teams!away_team_id(team_name)
+            `)
+            .order('created_at', { ascending: false });
+
+        if (!isSuperAdmin && myAcademyId) {
+            matchesQuery = matchesQuery.eq('academy_id', myAcademyId);
+        }
+
+        // Fetch matches, analysts (same academy), and assignments in parallel
+        let analystsQuery = supabase.from('profiles').select('id, username').order('username');
+        if (!isSuperAdmin && myAcademyId) {
+            analystsQuery = analystsQuery.eq('academy_id', myAcademyId);
+        }
+
         const [matchesResult, analystsResult, assignmentsResult] = await Promise.all([
-            supabase
-                .from('matches')
-                .select(`
-                    match_id, match_name, match_date, status, video_url, locked_by, locked_at, created_by,
-                    home_team:teams!home_team_id(team_name),
-                    away_team:teams!away_team_id(team_name)
-                `)
-                .order('created_at', { ascending: false }),
-            supabase.from('profiles').select('id, username').order('username'),
+            matchesQuery,
+            analystsQuery,
             supabase.from('match_assignments').select('match_id, user_id')
         ]);
 
         if (matchesResult.error) throw matchesResult.error;
-        const allMatches = matchesResult.data;
+        const matches = matchesResult.data || [];
         const analystList = analystsResult.data || [];
         const assignments = assignmentsResult.data || [];
 
@@ -48,11 +68,6 @@ export async function initMatches() {
             if (!assignmentMap[a.match_id]) assignmentMap[a.match_id] = [];
             assignmentMap[a.match_id].push(a.user_id);
         });
-
-        // Filter: show matches created by user OR assigned to user
-        const matches = allMatches.filter(m =>
-            m.created_by === user.id || (assignmentMap[m.match_id] || []).includes(user.id)
-        );
 
         // Build username lookup
         const usernames = {};

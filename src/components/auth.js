@@ -25,7 +25,7 @@ export function LoginView() {
                 <button type="submit" class="btn btn-primary" id="login-btn">Sign In</button>
                 <div style="margin-top: 16px; text-align: center; display: flex; flex-direction: column; gap: 8px;">
                     <a href="#forgot-password" class="btn btn-ghost" style="font-size: 0.8125rem; color: var(--warning);">Forgot Password?</a>
-                    <a href="#register" class="btn btn-ghost" style="font-size: 0.8125rem;">Don't have an account? Register</a>
+                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Account creation is managed by your administrator.</p>
                 </div>
             </form>
         </div>
@@ -35,28 +35,15 @@ export function LoginView() {
 export function RegisterView() {
     return `
         <div class="auth-card">
-            <h2 class="auth-title">Create Account</h2>
-            <p class="auth-subtitle">Join the CAC Match Tagging Center</p>
-            <form id="register-form" autocomplete="on">
-                <div class="form-group">
-                    <label class="form-label">Email Address</label>
-                    <input type="email" id="email" class="form-input" required placeholder="name@example.com" autocomplete="email">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Username (Display Name)</label>
-                    <input type="text" id="username" class="form-input" required placeholder="Your display name" autocomplete="username" minlength="2" maxlength="30">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Password</label>
-                    <input type="password" id="password" class="form-input" required placeholder="Min 8 chars, letters, numbers, special" autocomplete="new-password" minlength="8">
-                    <div id="password-strength" style="font-size: 0.7rem; margin-top: 4px; color: var(--text-muted);"></div>
-                </div>
-                <div id="auth-error" style="color: var(--danger); font-size: 0.875rem; margin-bottom: 20px; display: none;"></div>
-                <button type="submit" class="btn btn-primary" id="register-btn">Create Account</button>
-                <div style="margin-top: 16px; text-align: center;">
-                    <a href="#login" class="btn btn-ghost" style="font-size: 0.8125rem;">Already have an account? Login</a>
-                </div>
-            </form>
+            <h2 class="auth-title">Registration Closed</h2>
+            <p class="auth-subtitle">Accounts on this site are created by the super admin.</p>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 20px 0;">
+                If you need access, please contact your administrator. They will create an analyst account
+                and assign you to your academy.
+            </p>
+            <div style="margin-top: 16px; text-align: center;">
+                <a href="#login" class="btn btn-primary" style="display: inline-block;">Back to Login</a>
+            </div>
         </div>
     `;
 }

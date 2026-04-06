@@ -49,7 +49,7 @@ export const router = {
             component: () => import('./components/adminPortal').then(m => m.AdminPortalView()),
             onRender: () => import('./components/adminPortal').then(m => m.initAdminPortal?.()),
             requiresAuth: true,
-            requiresAdmin: true
+            requiresSuperAdmin: true
         },
     },
 

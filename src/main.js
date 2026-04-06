@@ -19,6 +19,7 @@ class App {
         this.appElement = document.getElementById('app');
         this.user = null;
         this.userRole = null;
+        this.academyId = null;
         this._sessionWarningTimer = null;
         this._sessionExpireTimer = null;
         this._renderLock = null;
@@ -117,26 +118,43 @@ class App {
         this.user = user;
 
         if (user) {
-            // Fetch role with retry — don't reset to null first so stale role
-            // is better than no role during concurrent calls
+            // Fetch role + academy with retry — don't reset to null first so
+            // stale data is better than nothing during concurrent calls
             for (let attempt = 0; attempt < 2; attempt++) {
                 try {
                     const { data: profile, error } = await supabase
                         .from('profiles')
-                        .select('role')
+                        .select('role, academy_id')
                         .eq('id', user.id)
                         .single();
                     if (error) throw error;
                     this.userRole = profile?.role || 'analyst';
+                    this.academyId = profile?.academy_id || null;
                     break;
                 } catch (e) {
                     console.warn(`Role fetch attempt ${attempt + 1} failed:`, e.message);
                     if (attempt === 1) this.userRole = this.userRole || 'analyst';
                 }
             }
+
+            // Defensive: only super_admin and analyst can use this site
+            if (this.userRole !== 'super_admin' && this.userRole !== 'analyst') {
+                alert('Your account role is not allowed on this site. Please contact your administrator.');
+                await supabase.auth.signOut();
+                return;
+            }
+
+            // Analysts MUST be assigned to an academy by the super_admin
+            if (this.userRole === 'analyst' && !this.academyId) {
+                alert('Your account has not been assigned to an academy yet. Please contact your administrator.');
+                await supabase.auth.signOut();
+                return;
+            }
+
             this.resetSessionTimers();
         } else {
             this.userRole = null;
+            this.academyId = null;
             clearTimeout(this._sessionWarningTimer);
             clearTimeout(this._sessionExpireTimer);
         }
@@ -168,8 +186,8 @@ class App {
             return;
         }
 
-        // Admin guard — server-side role check, not just client-side
-        if (route.requiresAdmin && this.userRole !== 'admin') {
+        // Super admin guard — RLS also enforces this server-side
+        if (route.requiresSuperAdmin && this.userRole !== 'super_admin') {
             window.location.hash = '#create-match';
             return;
         }
@@ -187,7 +205,7 @@ class App {
             // Authenticated layout
             const displayName = esc(this.user.user_metadata?.username ?? 'User');
             const avatarLetter = esc(this.user.email?.[0]?.toUpperCase() ?? 'U');
-            const roleName = esc(this.userRole || 'Analyst');
+            const roleName = esc(this.userRole === 'super_admin' ? 'Super Admin' : 'Analyst');
 
             this.appElement.innerHTML = `
                 <!-- Offline Banner -->
@@ -212,7 +230,7 @@ class App {
                             <a href="#analytics" class="nav-item ${hash === '#analytics' ? 'active' : ''}">
                                 <span>#</span> Analytics
                             </a>
-                            ${this.userRole === 'admin' ? `
+                            ${this.userRole === 'super_admin' ? `
                             <a href="#admin" class="nav-item ${hash.startsWith('#admin') ? 'active' : ''}">
                                 <span>*</span> Admin Portal
                             </a>` : ''}

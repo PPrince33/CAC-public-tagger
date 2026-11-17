@@ -59,6 +59,16 @@ export function TaggerView() {
                     <div class="card" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 16px; min-height: 300px; flex-shrink: 0;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
                             <h4 style="margin:0;">Event Log</h4>
+                            <div style="display: flex; gap: 12px; align-items: center; font-size: 0.75rem;" title="Set each team's colour to match their jersey">
+                                <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+                                    <input type="color" id="home-color-input" value="#ef4444" class="team-color-input">
+                                    <span id="home-color-label" style="font-weight:700;text-transform:uppercase;">Home</span>
+                                </label>
+                                <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+                                    <input type="color" id="away-color-input" value="#3b82f6" class="team-color-input">
+                                    <span id="away-color-label" style="font-weight:700;text-transform:uppercase;">Away</span>
+                                </label>
+                            </div>
                             <div style="display: flex; gap: 8px; align-items: center;">
                                 <span id="sync-status" style="font-size: 0.8125rem; color: var(--text-muted);"></span>
                                 <button id="sync-btn" class="btn btn-ghost" style="width: auto; padding: 4px 12px; font-size: 0.8125rem; color: var(--success);">Sync All</button>
@@ -306,6 +316,12 @@ export function TaggerView() {
                 .player-btn.action-active { background: #22c55e !important; color: white !important; border-color: #22c55e !important; }
                 .player-btn.reaction-active { background: #ef4444 !important; color: white !important; border-color: #ef4444 !important; }
                 .player-btn.disabled { opacity: 0.3; cursor: not-allowed; }
+                .team-color-input { width: 22px; height: 22px; padding: 0; border: 1px solid var(--border); border-radius: 4px; background: none; cursor: pointer; }
+                .team-color-input::-webkit-color-swatch-wrapper { padding: 2px; }
+                .team-color-input::-webkit-color-swatch { border: none; border-radius: 2px; }
+                .log-time-btn { background: none; border: none; padding: 0; font: inherit; font-family: var(--font-mono); font-weight: 600; color: var(--accent); text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; }
+                .log-time-btn:hover { text-decoration-style: solid; }
+                .team-chip { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; border: 1px solid rgba(0,0,0,0.25); }
                 .dial-btn { width: 30px; height: 30px; min-width: 30px; min-height: 30px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 0.7rem; }
                 .kbd { display: inline-block; padding: 2px 8px; background: var(--primary-light); border: 1px solid var(--border); border-radius: 4px; font-family: var(--font-mono); font-size: 0.8125rem; font-weight: 700; }
                 .lock-banner { padding: 8px 16px; font-size: 0.8rem; font-weight: 600; text-align: center; border-radius: var(--radius-md); margin-bottom: 4px; }
@@ -342,6 +358,62 @@ let _lastLogTime = 0; // Debounce for Enter key
 let _toastTimeout = null; // Toast dismissal timer
 let _initAbortController = null; // AbortController for cleaning up event listeners on re-init
 let _cachedUser = null; // Cached Supabase user — avoids network call on every logEvent
+const DEFAULT_TEAM_COLORS = { home: '#ef4444', away: '#3b82f6' };
+let teamColors = { ...DEFAULT_TEAM_COLORS };
+
+function teamColorsKey() {
+    return activeMatch ? `cac_team_colors_${activeMatch.match_id}` : null;
+}
+
+function loadTeamColors() {
+    teamColors = { ...DEFAULT_TEAM_COLORS };
+    const key = teamColorsKey();
+    if (!key) return;
+    try {
+        const saved = JSON.parse(localStorage.getItem(key) || 'null');
+        if (saved && /^#[0-9a-f]{6}$/i.test(saved.home)) teamColors.home = saved.home;
+        if (saved && /^#[0-9a-f]{6}$/i.test(saved.away)) teamColors.away = saved.away;
+    } catch (e) { /* ignore corrupt storage */ }
+}
+
+function saveTeamColors() {
+    const key = teamColorsKey();
+    if (!key) return;
+    try { localStorage.setItem(key, JSON.stringify(teamColors)); } catch (e) { /* storage unavailable */ }
+}
+
+// Apply team colours to the colour pickers and team name headers
+function applyTeamColors() {
+    const homeInput = document.getElementById('home-color-input');
+    const awayInput = document.getElementById('away-color-input');
+    if (homeInput) homeInput.value = teamColors.home;
+    if (awayInput) awayInput.value = teamColors.away;
+    ['home-team-name', 'dial-home-name', 'home-color-label'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.color = teamColors.home;
+    });
+    ['away-team-name', 'dial-away-name', 'away-color-label'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.color = teamColors.away;
+    });
+}
+
+// Resolve which side ('home' | 'away' | null) an event belongs to
+function getEventSide(e) {
+    if (!activeMatch) return null;
+    let teamId = e.team_id;
+    if (!teamId && e.player_id) {
+        const lineupItem = activeLineup.find(l => l.player_id === e.player_id);
+        teamId = lineupItem?.team_id;
+    }
+    if (teamId === activeMatch.home_team_id) return 'home';
+    if (teamId === activeMatch.away_team_id) return 'away';
+    return null;
+}
+
+function escapeHtml(str) {
+    return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
 let currentState = {
     actionPlayer: null,
     reactionPlayer: null,
@@ -822,6 +894,22 @@ export async function initTagger() {
     document.getElementById('match-subtitle').innerText = `Match ID: ${match.match_id.split('-')[0]}... | ${match.is_futsal ? 'Futsal' : 'Football'}`;
     document.getElementById('home-team-name').innerText = match.home_team.team_name;
     document.getElementById('away-team-name').innerText = match.away_team.team_name;
+    document.getElementById('home-color-label').innerText = match.home_team.team_name;
+    document.getElementById('away-color-label').innerText = match.away_team.team_name;
+
+    // Team colours (per match, editable to match jersey colours)
+    loadTeamColors();
+    applyTeamColors();
+    ['home', 'away'].forEach(side => {
+        document.getElementById(`${side}-color-input`).addEventListener('input', (ev) => {
+            teamColors[side] = ev.target.value;
+            saveTeamColors();
+            applyTeamColors();
+            renderStaging();
+        }, { signal });
+        // Give focus back so tagging hotkeys keep working after picking a colour
+        document.getElementById(`${side}-color-input`).addEventListener('change', (ev) => ev.target.blur(), { signal });
+    });
 
     // 2. Initialize Engines
     pitch = new PitchCanvas('pitch-canvas', match.is_futsal);
@@ -1599,10 +1687,14 @@ function renderStaging() {
     if (!body) return;
 
     const renderRow = (e, idx, isSynced) => {
+        const side = getEventSide(e);
+        const teamColor = side ? teamColors[side] : 'var(--border)';
+        const teamName = side && activeMatch ? activeMatch[`${side}_team`]?.team_name || side : 'Unknown team';
         const bgColor = isSynced
-            ? 'background: rgba(40, 167, 69, 0.08); border-left: 3px solid var(--success);'
+            ? 'background: rgba(40, 167, 69, 0.08);'
             : (idx % 2 === 0 ? 'background: rgba(0,0,0,0.02);' : '');
-        const timeStr = `${Math.floor(e.match_time_seconds / 60)}:${(e.match_time_seconds % 60).toString().padStart(2, '0')}`;
+        const secs = Math.max(0, Number(e.match_time_seconds) || 0);
+        const timeStr = `${Math.floor(secs / 60)}:${(secs % 60).toString().padStart(2, '0')}`;
         const playerDisplay = e._ui_player || 'Unknown';
         const reactionDisplay = e._ui_reaction_player || '';
 
@@ -1611,8 +1703,10 @@ function renderStaging() {
         const editClick = isSynced ? '' : `data-edit-idx="${idx}"`;
 
         return `
-            <tr style="border-bottom: 1px solid var(--border); ${bgColor}">
-                <td style="padding: 6px; white-space: nowrap;">${timeStr}</td>
+            <tr style="border-bottom: 1px solid var(--border); border-left: 4px solid ${teamColor}; ${bgColor}">
+                <td style="padding: 6px; white-space: nowrap;">
+                    <span class="team-chip" style="background:${teamColor};" title="${escapeHtml(teamName)}"></span><button type="button" class="log-time-btn" data-seek="${secs}" title="Jump video to ${timeStr}">${timeStr}</button>
+                </td>
                 <td style="padding: 6px; font-weight: 600;">${e.team_direction}</td>
                 <td style="padding: 6px;" class="${editableClass}" ${editClick} data-edit-field="action">
                     <span style="font-weight:600;">${e.action}</span><br>
@@ -1653,6 +1747,21 @@ function renderStaging() {
         renderStaging();
         updateProgress();
     };
+
+    // Clickable timestamps: jump the video to the event's time
+    body.querySelectorAll('.log-time-btn').forEach(btn => {
+        btn.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            const t = Number(btn.dataset.seek);
+            if (!video || isNaN(t)) {
+                showEventToast('Load a video first to jump to this event');
+                return;
+            }
+            video.seek(t);
+            btn.blur(); // keep keyboard hotkeys working after the click
+            showEventToast(`Jumped to ${btn.textContent}`);
+        });
+    });
 
     // Inline editing for unsynced events
     body.querySelectorAll('[data-edit-idx]').forEach(cell => {

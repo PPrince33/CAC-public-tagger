@@ -475,6 +475,26 @@ function getEventSide(e) {
     return null;
 }
 
+// Resolve which side ('home' | 'away' | null) a player belongs to, from the lineup
+function getPlayerSide(playerId) {
+    if (!activeMatch || !playerId) return null;
+    const teamId = activeLineup.find(l => l.player_id === playerId)?.team_id;
+    if (teamId === activeMatch.home_team_id) return 'home';
+    if (teamId === activeMatch.away_team_id) return 'away';
+    return null;
+}
+
+// Inline style that paints text in a team colour, outlining very light colours
+// (e.g. white or yellow jerseys) so they stay readable on a light background
+function teamTextStyle(side) {
+    if (!side) return '';
+    const hex = teamColors[side];
+    const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255);
+    const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    const outline = luminance > 0.75 ? 'text-shadow:0 0 1px #000,0 0 1px #000;' : '';
+    return `color:${hex};font-weight:700;${outline}`;
+}
+
 function escapeHtml(str) {
     return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
@@ -2021,8 +2041,8 @@ function renderStaging() {
                 <td style="padding: 6px;" class="${editableClass}" ${editClick} data-edit-field="body_part">${e.body_part || '-'}</td>
                 <td style="padding: 6px;">${e.pressure_on ? 'Y' : 'N'}</td>
                 <td style="padding: 6px; white-space: nowrap;">
-                    ACT: ${playerDisplay}<br>
-                    ${reactionDisplay ? '<span style="color:var(--text-muted);font-size:0.65rem;">RCT: '+reactionDisplay+'</span>' : ''}
+                    <span style="color:var(--text-muted);">ACT:</span> <span style="${teamTextStyle(getPlayerSide(e.player_id) || side)}">${escapeHtml(playerDisplay)}</span><br>
+                    ${reactionDisplay ? `<span style="font-size:0.65rem;"><span style="color:var(--text-muted);">RCT:</span> <span style="${teamTextStyle(getPlayerSide(e.reaction_player_id))}">${escapeHtml(reactionDisplay)}</span></span>` : ''}
                 </td>
                 <td style="padding: 6px; font-family: var(--font-mono); font-size: 0.65rem; white-space: nowrap;">
                     S: ${e.start_x},${e.start_y}<br>

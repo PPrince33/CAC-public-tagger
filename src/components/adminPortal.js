@@ -101,6 +101,8 @@ export function AdminPortalView() {
                     <button class="dl-btn" id="bulk-status-doing">Set: Doing</button>
                     <button class="dl-btn" id="bulk-status-qc">Set: QC</button>
                     <button class="dl-btn" id="bulk-status-done">Set: Done</button>
+                    <button class="dl-btn" id="bulk-hide-reports">Hide from reports</button>
+                    <button class="dl-btn" id="bulk-show-reports">Show in reports</button>
                     <button class="dl-btn" id="bulk-export-xlsx">Export XLSX</button>
                     <button class="dl-btn" id="bulk-export-csv">Export CSV</button>
                     <button class="dl-btn" id="bulk-delete" style="color: var(--danger); border-color: var(--danger);">Delete</button>
@@ -121,11 +123,12 @@ export function AdminPortalView() {
                                 <th>Status</th>
                                 <th>Events</th>
                                 <th>Type</th>
+                                <th title="Hidden matches never appear in match reports, player reports or /players">Reports</th>
                                 <th>Download</th>
                             </tr>
                         </thead>
                         <tbody id="admin-matches-tbody">
-                            <tr><td colspan="11" style="text-align: center; padding: 40px; color: var(--text-muted);">Loading...</td></tr>
+                            <tr><td colspan="12" style="text-align: center; padding: 40px; color: var(--text-muted);">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -363,6 +366,8 @@ export async function initAdminPortal() {
     document.getElementById('bulk-status-doing').addEventListener('click', () => bulkChangeStatus('Doing'));
     document.getElementById('bulk-status-qc').addEventListener('click', () => bulkChangeStatus('QC'));
     document.getElementById('bulk-status-done').addEventListener('click', () => bulkChangeStatus('Done'));
+    document.getElementById('bulk-hide-reports').addEventListener('click', () => selectedMatchIds.size && setReportVisibility([...selectedMatchIds], true));
+    document.getElementById('bulk-show-reports').addEventListener('click', () => selectedMatchIds.size && setReportVisibility([...selectedMatchIds], false));
     document.getElementById('bulk-export-xlsx').addEventListener('click', () => bulkExport('xlsx'));
     document.getElementById('bulk-export-csv').addEventListener('click', () => bulkExport('csv'));
     document.getElementById('bulk-delete').addEventListener('click', bulkDelete);
@@ -397,7 +402,7 @@ async function fetchAdminMatches() {
     ]);
 
     if (matchRes.error) {
-        document.getElementById('admin-matches-tbody').innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 40px; color: var(--danger);">${matchRes.error.message}</td></tr>`;
+        document.getElementById('admin-matches-tbody').innerHTML = `<tr><td colspan="12" style="text-align: center; padding: 40px; color: var(--danger);">${matchRes.error.message}</td></tr>`;
         return;
     }
 
@@ -445,7 +450,7 @@ function renderMatchRows() {
     ) : allMatches;
 
     if (!filtered.length) {
-        tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 40px; color: var(--text-muted);">${q ? 'No matches found.' : 'No matches in the system.'}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; padding: 40px; color: var(--text-muted);">${q ? 'No matches found.' : 'No matches in the system.'}</td></tr>`;
         return;
     }
 
@@ -487,12 +492,22 @@ function renderMatchRows() {
             <td><span class="admin-status" style="background: ${sc.bg}; color: ${sc.color};">${m.status}</span></td>
             <td style="text-align: center;">${m.eventCount}</td>
             <td>${m.is_futsal ? 'Futsal' : '11v11'}</td>
+            <td><button class="dl-btn report-toggle" data-id="${m.match_id}" title="Click to ${m.exclude_from_reports ? 'show this match in' : 'hide this match from'} reports"
+                style="${m.exclude_from_reports ? 'color: var(--danger); border-color: var(--danger);' : 'color: var(--success); border-color: var(--success);'}">${m.exclude_from_reports ? 'Hidden' : 'Shown'}</button></td>
             <td style="white-space: nowrap;">
                 <button class="dl-btn" data-action="xlsx" data-id="${m.match_id}" data-name="${m.match_name}">XLSX</button>
                 <button class="dl-btn" data-action="csv" data-id="${m.match_id}" data-name="${m.match_name}">CSV</button>
             </td>
         </tr>`;
     }).join('');
+
+    // Report visibility toggle (one match)
+    tbody.querySelectorAll('.report-toggle').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const m = allMatches.find(x => x.match_id === btn.dataset.id);
+            setReportVisibility([m.match_id], !m.exclude_from_reports);
+        });
+    });
 
     // Checkbox event delegation for bulk selection
     tbody.querySelectorAll('.match-checkbox').forEach(cb => {
@@ -577,6 +592,20 @@ function statusStyle(status) {
 /* ──────────────────────────────────────────
    BULK OPERATIONS
    ────────────────────────────────────────── */
+// Hide matches from (or show them in) the public match / player reports.
+// Nothing is deleted; the report app skips matches with exclude_from_reports = true.
+async function setReportVisibility(ids, hide) {
+    const { error } = await supabase.from('matches').update({ exclude_from_reports: hide }).in('match_id', ids);
+    if (error) {
+        alert(/exclude_from_reports/.test(error.message)
+            ? 'Run supabase/exclude_from_reports.sql in the Supabase SQL editor first.'
+            : 'Could not update report visibility: ' + error.message);
+        return;
+    }
+    allMatches.forEach(m => { if (ids.includes(m.match_id)) m.exclude_from_reports = hide; });
+    renderMatchRows();
+}
+
 async function bulkChangeStatus(newStatus) {
     if (selectedMatchIds.size === 0) return;
     if (!confirm(`Change ${selectedMatchIds.size} matches to "${newStatus}"?`)) return;

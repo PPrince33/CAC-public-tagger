@@ -6,6 +6,7 @@ import { GoalFaceCanvas } from '../lib/goalFace'
 import { VideoEngine } from '../lib/videoEngine'
 import { PlayerTracker } from '../lib/playerTracker'
 import { finalizeMatch } from '../lib/finalizeMatch'
+import { ensurePlaceholders } from '../lib/placeholders'
 
 export function TaggerView() {
     return `
@@ -18,7 +19,10 @@ export function TaggerView() {
             <header class="tagger-header" style="display: flex; justify-content: space-between; align-items: center; padding: 0 8px; flex-wrap: wrap; gap: 8px;">
                 <div>
                     <h2 id="match-title" style="margin-bottom: 4px;">Loading Match...</h2>
-                    <div id="match-subtitle" style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Match ID: ...</div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span id="tagging-mode-badge" style="display: none; font-size: 0.65rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; padding: 2px 8px; border-radius: 99px; color: #fff;"></span>
+                        <div id="match-subtitle" style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Match ID: ...</div>
+                    </div>
                 </div>
                 <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                     <!-- Progress Indicator -->
@@ -1045,6 +1049,7 @@ export async function initTagger() {
     document.getElementById('match-subtitle').innerText = `Match ID: ${match.match_id.split('-')[0]}... | ${match.is_futsal ? 'Futsal' : 'Football'}`;
     document.getElementById('home-team-name').innerText = match.home_team.team_name;
     document.getElementById('away-team-name').innerText = match.away_team.team_name;
+    renderModeBadge();
     document.getElementById('home-color-label').innerText = match.home_team.team_name;
     document.getElementById('away-color-label').innerText = match.away_team.team_name;
 
@@ -1228,18 +1233,23 @@ export async function initTagger() {
     _restoringSession = true;
     updateOutcomes();
 
-    // 4. Fetch Lineups
+    // 4. Fetch Lineups (one-team / one-player matches get their stand-ins first)
+    if (taggingMode() !== 'full') {
+        try { await ensurePlaceholders(matchId, taggingMode()); }
+        catch (phErr) { console.warn('Could not create stand-in players:', phErr.message); }
+    }
     const { data: lineup, error: lErr } = await supabase
         .from('lineups')
         .select(`
             *,
-            players (player_name, position)
+            players (*)
         `)
         .eq('match_id', matchId);
 
     if (lErr) console.error(lErr);
     activeLineup = lineup || [];
     renderPlayerGrids();
+    applyFocusPlayer();
 
     // Load previously synced events from DB
     await loadSyncedEvents();
@@ -1329,6 +1339,7 @@ export async function initTagger() {
     document.getElementById('deselect-players-btn').addEventListener('click', () => {
         currentState.actionPlayer = null;
         currentState.reactionPlayer = null;
+        applyFocusPlayer();
         updateLineupState();
     }, { signal });
 
@@ -1511,7 +1522,7 @@ export async function initTagger() {
                 .from('lineups')
                 .select(`
                     *,
-                    players (player_name, position)
+                    players (*)
                 `)
                 .eq('match_id', activeMatch.match_id);
             if (refreshErr) throw refreshErr;
@@ -1568,6 +1579,43 @@ function toggleShortcutsModal() {
 // ──────────────────────────────────────────
 // PLAYER GRIDS
 // ──────────────────────────────────────────
+// ──────────────────────────────────────────
+// TAGGING MODES (full / team / player)
+// ──────────────────────────────────────────
+function taggingMode() {
+    return activeMatch?.tagging_mode || 'full';
+}
+
+function jerseyLabel(l) {
+    if (l.players?.is_placeholder) return l.players.player_name === 'Teammate' ? 'TM' : 'OPP';
+    return l.jersey_no ?? '—';
+}
+
+function renderModeBadge() {
+    const badge = document.getElementById('tagging-mode-badge');
+    if (!badge || !activeMatch) return;
+    const mode = taggingMode();
+    const focusSide = activeMatch.focus_team_id === activeMatch.away_team_id ? 'away' : 'home';
+    const oppSide = focusSide === 'home' ? 'away' : 'home';
+    if (mode === 'full') { badge.style.display = 'none'; return; }
+    badge.style.display = 'inline-block';
+    badge.style.background = mode === 'team' ? '#2563eb' : '#9333ea';
+    badge.innerText = mode === 'team' ? 'One team' : 'One player';
+    const focusName = activeMatch[`${focusSide}_team`]?.team_name || '';
+    const oppName = activeMatch[`${oppSide}_team`]?.team_name || '';
+    document.getElementById(`${focusSide}-team-name`).innerText = `${focusName} · tagged`;
+    document.getElementById(`${oppSide}-team-name`).innerText = `${oppName} · opponent`;
+}
+
+// Player mode: pre-select the focus player as the action player.
+function applyFocusPlayer() {
+    if (taggingMode() !== 'player' || currentState.actionPlayer) return;
+    const l = activeLineup.find(x => x.player_id === activeMatch.focus_player_id);
+    if (!l) return;
+    currentState.actionPlayer = { id: l.player_id, teamId: l.team_id, name: l.players.player_name, jersey: jerseyLabel(l) };
+    updateLineupState();
+}
+
 function renderPlayerGrids() {
     const homeGrid = document.getElementById('home-player-grid');
     const awayGrid = document.getElementById('away-player-grid');
@@ -1588,8 +1636,8 @@ function renderPlayerGrids() {
         players.forEach(p => {
             const btn = document.createElement('button');
             btn.className = `player-btn p-${p.player_id}`;
-            btn.title = `${p.players.player_name} (${p.players.position})`;
-            btn.textContent = p.jersey_no;
+            btn.title = p.players.is_placeholder ? `${p.players.player_name} (stand-in)` : `${p.players.player_name} (${p.players.position})`;
+            btn.textContent = jerseyLabel(p);
             btn.dataset.jersey = p.jersey_no;
             btn.addEventListener('click', () => {
                 window.taggerSelectPlayer(p.player_id, p.team_id, p.players.player_name, p.jersey_no);
@@ -1604,8 +1652,8 @@ function renderPlayerGrids() {
         players.forEach(p => {
             const btn = document.createElement('button');
             btn.className = `player-btn dial-btn p-${p.player_id}`;
-            btn.title = `${p.players.player_name} (${p.players.position})`;
-            btn.textContent = p.jersey_no;
+            btn.title = p.players.is_placeholder ? `${p.players.player_name} (stand-in)` : `${p.players.player_name} (${p.players.position})`;
+            btn.textContent = jerseyLabel(p);
             btn.addEventListener('click', () => {
                 window.taggerSelectPlayer(p.player_id, p.team_id, p.players.player_name, p.jersey_no);
                 document.getElementById('player-dial').style.display = 'none';
@@ -2015,6 +2063,12 @@ async function logEventWithNote(kickoffNote) {
 
     currentState.actionPlayer = next.actionPlayer;
     currentState.reactionPlayer = next.reactionPlayer;
+    if (taggingMode() === 'player') {
+        // Player mode: the focus player is always the action player
+        if (currentState.reactionPlayer?.id === activeMatch.focus_player_id) currentState.reactionPlayer = null;
+        currentState.actionPlayer = null;
+        applyFocusPlayer();
+    }
     updateLineupState();
 }
 

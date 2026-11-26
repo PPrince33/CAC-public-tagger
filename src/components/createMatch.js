@@ -1,5 +1,7 @@
 import * as XLSX from 'xlsx'
 import { supabase } from '../supabase'
+import { getOrCreateTeam, getOrCreatePlayer, createMatchRecord, addLineupRow } from '../lib/matchFactory'
+import { ensurePlaceholders } from '../lib/placeholders'
 
 export function CreateMatchView() {
     return `
@@ -13,6 +15,25 @@ export function CreateMatchView() {
                 <section class="card">
                     <h3 style="margin-bottom: 24px;">Match Metadata</h3>
                     <form id="match-meta-form">
+                        <div class="form-group">
+                            <label class="form-label">Tagging Mode</label>
+                            <select id="tagging-mode" class="form-input">
+                                <option value="full">Full match (both teams)</option>
+                                <option value="team">One team only</option>
+                                <option value="player">One player only</option>
+                            </select>
+                            <p id="tagging-mode-help" style="font-size: 0.75rem; color: var(--text-muted); margin: 6px 0 0;"></p>
+                        </div>
+                        <div id="team-mode-fields" style="display: none;">
+                            <div class="form-group">
+                                <label class="form-label">Focus Team (the team we tag)</label>
+                                <select id="focus-team-select" class="form-input"><option value="">Upload a roster first</option></select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Opponent Team Name <span style="font-weight: 400; color: var(--text-muted);">(only if the roster has one team)</span></label>
+                                <input type="text" id="team-opponent-name" class="form-input" placeholder="e.g. Legia Warszawa U17">
+                            </div>
+                        </div>
                         <div class="form-group">
                             <label class="form-label">Tournament Name</label>
                             <input type="text" id="tournament-name" class="form-input" required placeholder="e.g. Futsal Champions League 2024">
@@ -47,7 +68,49 @@ export function CreateMatchView() {
                     </form>
                 </section>
 
-                <section class="card">
+                <section class="card" id="player-mode-card" style="display: none;">
+                    <h3 style="margin-bottom: 16px;">Focus Player</h3>
+                    <div class="form-group">
+                        <label class="form-label">Search existing players</label>
+                        <input type="text" id="pm-search" class="form-input" placeholder="Type at least 2 letters...">
+                        <div id="pm-results" style="display: flex; flex-direction: column; gap: 4px; margin-top: 8px; max-height: 220px; overflow-y: auto;"></div>
+                    </div>
+                    <div id="pm-selected" style="display: none; padding: 10px 12px; background: var(--primary-light); border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 0.875rem; margin-bottom: 16px;"></div>
+                    <details id="pm-new" style="margin-bottom: 16px;">
+                        <summary style="cursor: pointer; font-size: 0.875rem; font-weight: 600;">+ Create a new player</summary>
+                        <div style="margin-top: 12px;">
+                            <div class="form-group">
+                                <label class="form-label">Player Name</label>
+                                <input type="text" id="pm-new-name" class="form-input" placeholder="Full name">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Position</label>
+                                <select id="pm-new-position" class="form-input">
+                                    <option value="">—</option><option>GK</option><option>DF</option><option>MF</option><option>FW</option>
+                                </select>
+                            </div>
+                        </div>
+                    </details>
+                    <div class="form-group">
+                        <label class="form-label">Player's Team in this Match</label>
+                        <input type="text" id="pm-team-name" class="form-input" placeholder="e.g. MKS Podlasie U19">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Jersey Number <span style="font-weight: 400; color: var(--text-muted);">(optional)</span></label>
+                        <input type="number" id="pm-jersey" class="form-input" min="1" max="99" placeholder="e.g. 10">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Home or Away</label>
+                        <select id="pm-is-home" class="form-input"><option value="true">Home</option><option value="false">Away</option></select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Opponent Team Name <span style="font-weight: 400; color: var(--text-muted);">(optional)</span></label>
+                        <input type="text" id="pm-opponent-name" class="form-input" placeholder="Leave blank for a generic Opponent">
+                    </div>
+                    <div id="pm-status" style="font-size: 0.875rem;"></div>
+                </section>
+
+                <section class="card" id="roster-card">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
                         <h3 style="margin-bottom: 0;">Roster Upload</h3>
                         <button id="download-template-btn" class="btn btn-ghost" style="width: auto; padding: 4px 12px; font-size: 0.75rem; border: 1px solid var(--border);">📥 Download Template</button>
@@ -107,8 +170,97 @@ let matchState = {
     date: '',
     videoType: 'youtube',
     ytUrl: '',
-    isFutsal: 'true'
+    isFutsal: 'true',
+    mode: 'full'
 };
+let focusPlayer = null; // { player_id, player_name, position, team_name } in player mode
+
+const MODE_HELP = {
+    full: 'Tag both teams. Upload the full roster.',
+    team: 'Tag one team only. Opponent actions go to a shared "Opponent" stand-in; opponent roster is optional.',
+    player: 'Tag one player only. No roster needed: the lineup is the player plus "Opponent" and "Teammate" stand-ins.'
+};
+
+function applyMode(mode) {
+    matchState.mode = mode;
+    document.getElementById('tagging-mode-help').innerText = MODE_HELP[mode];
+    document.getElementById('team-mode-fields').style.display = mode === 'team' ? 'block' : 'none';
+    document.getElementById('player-mode-card').style.display = mode === 'player' ? 'block' : 'none';
+    document.getElementById('roster-card').style.display = mode === 'player' ? 'none' : 'block';
+    refreshCreateEnabled();
+}
+
+function refreshCreateEnabled() {
+    const btn = document.getElementById('create-match-btn');
+    if (!btn) return;
+    if (matchState.mode === 'player') {
+        const newName = document.getElementById('pm-new-name')?.value.trim();
+        btn.disabled = !(focusPlayer || newName);
+    } else btn.disabled = !parsedRoster;
+}
+
+function fillFocusTeamOptions() {
+    const sel = document.getElementById('focus-team-select');
+    if (!sel) return;
+    if (!parsedRoster) { sel.innerHTML = '<option value="">Upload a roster first</option>'; return; }
+    const teams = [...new Set(parsedRoster.map(p => p.teamName))];
+    const prev = sel.value;
+    sel.innerHTML = teams.map(t => `<option value="${t.replace(/"/g, '&quot;')}">${t}</option>`).join('');
+    if (teams.includes(prev)) sel.value = prev;
+}
+
+function escapeHtml(v) {
+    return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function renderSelectedPlayer() {
+    const box = document.getElementById('pm-selected');
+    if (!focusPlayer) { box.style.display = 'none'; refreshCreateEnabled(); return; }
+    box.style.display = 'block';
+    box.innerHTML = `Selected: <strong>${escapeHtml(focusPlayer.player_name)}</strong> ` +
+        `${focusPlayer.position ? '(' + escapeHtml(focusPlayer.position) + ') ' : ''}` +
+        `<span style="color: var(--text-muted);">${escapeHtml(focusPlayer.team_name || '')}</span> ` +
+        `<button type="button" id="pm-clear" class="btn btn-ghost" style="width: auto; padding: 2px 8px; font-size: 0.75rem; margin-left: 8px;">Change</button>`;
+    document.getElementById('pm-clear').onclick = () => { focusPlayer = null; renderSelectedPlayer(); };
+    const teamInput = document.getElementById('pm-team-name');
+    if (!teamInput.value && focusPlayer.team_name) teamInput.value = focusPlayer.team_name;
+    refreshCreateEnabled();
+}
+
+function initPlayerMode() {
+    const search = document.getElementById('pm-search');
+    const results = document.getElementById('pm-results');
+    let timer = null, seq = 0;
+    search.addEventListener('input', () => {
+        clearTimeout(timer);
+        const q = search.value.trim();
+        if (q.length < 2) { results.innerHTML = ''; return; }
+        timer = setTimeout(async () => {
+            const mySeq = ++seq;
+            const { data, error } = await supabase.from('players')
+                .select('player_id, player_name, position, team_id, teams(team_name)')
+                .ilike('player_name', `%${q}%`).eq('is_placeholder', false).order('player_name').limit(20);
+            if (mySeq !== seq) return;
+            if (error) { results.innerHTML = `<span style="color: var(--danger); font-size: 0.8rem;">${escapeHtml(error.message)}</span>`; return; }
+            results.innerHTML = (data || []).length ? '' : '<span style="color: var(--text-muted); font-size: 0.8rem;">No players found. Create a new one below.</span>';
+            (data || []).forEach(p => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'btn btn-ghost';
+                b.style.cssText = 'text-align: left; padding: 6px 10px; font-size: 0.8125rem; border: 1px solid var(--border);';
+                b.innerHTML = `<strong>${escapeHtml(p.player_name)}</strong> ${p.position ? '· ' + escapeHtml(p.position) : ''} <span style="color: var(--text-muted);">· ${escapeHtml(p.teams?.team_name || 'No team')}</span>`;
+                b.onclick = () => {
+                    focusPlayer = { player_id: p.player_id, player_name: p.player_name, position: p.position, team_name: p.teams?.team_name };
+                    results.innerHTML = ''; search.value = '';
+                    renderSelectedPlayer();
+                };
+                results.appendChild(b);
+            });
+        }, 250);
+    });
+    document.getElementById('pm-new-name').addEventListener('input', refreshCreateEnabled);
+    renderSelectedPlayer();
+}
 
 export function initCreateMatch() {
     const uploadZone = document.getElementById('upload-zone');
@@ -196,6 +348,13 @@ export function initCreateMatch() {
     });
 
     createBtn.addEventListener('click', handleCreateMatch);
+
+    const modeSel = document.getElementById('tagging-mode');
+    modeSel.value = matchState.mode;
+    modeSel.addEventListener('change', () => applyMode(modeSel.value));
+    initPlayerMode();
+    fillFocusTeamOptions();
+    applyMode(matchState.mode);
 }
 
 async function handleFile(file) {
@@ -238,6 +397,7 @@ async function handleFile(file) {
         }
 
         renderPreview();
+        fillFocusTeamOptions();
         status.innerText = `Successfully loaded ${parsedRoster.length} players.`;
         status.style.color = 'var(--success)';
         document.getElementById('create-match-btn').disabled = false;
@@ -283,8 +443,9 @@ function renderPreview() {
 
 async function handleCreateMatch() {
     const btn = document.getElementById('create-match-btn');
-    const status = document.getElementById('upload-status');
-    
+    const mode = document.getElementById('tagging-mode').value;
+    const status = document.getElementById(mode === 'player' ? 'pm-status' : 'upload-status');
+
     const tournament = document.getElementById('tournament-name').value.trim();
     const name = document.getElementById('match-name').value.trim();
     const date = document.getElementById('match-date').value;
@@ -298,6 +459,16 @@ async function handleCreateMatch() {
     if (!date) missing.push('Match Date');
     if (videoType === 'youtube' && !ytUrl) missing.push('YouTube URL');
 
+    if (mode === 'team') {
+        const teamNames = [...new Set((parsedRoster || []).map(p => p.teamName))];
+        if (!document.getElementById('focus-team-select').value) missing.push('Focus Team');
+        if (teamNames.length < 2 && !document.getElementById('team-opponent-name').value.trim()) missing.push('Opponent Team Name (roster has only one team)');
+    }
+    if (mode === 'player') {
+        if (!focusPlayer && !document.getElementById('pm-new-name').value.trim()) missing.push('Focus Player (search or create)');
+        if (!document.getElementById('pm-team-name').value.trim()) missing.push("Player's Team in this Match");
+    }
+
     if (missing.length > 0) {
         alert('Please fill in the following missing metadata:\n- ' + missing.join('\n- '));
         return;
@@ -306,96 +477,21 @@ async function handleCreateMatch() {
     btn.innerText = 'Initializing Match...';
     btn.disabled = true;
 
+    const baseMatch = {
+        match_name: name,
+        tournament_name: tournament,
+        match_date: date,
+        is_futsal: isFutsal,
+        video_url: videoType === 'youtube' ? ytUrl : null,
+        tagging_mode: mode,
+    };
+
     try {
-        const { data: { user } } = await supabase.auth.getUser();
+        let matchId;
+        if (mode === 'player') matchId = await createPlayerModeMatch(baseMatch);
+        else matchId = await createRosterMatch(baseMatch, mode);
 
-        // Insert Teams
-        const teamsMap = new Map(); // teamName -> teamId
-        const teamNames = [...new Set(parsedRoster.map(p => p.teamName))];
-
-        for (const tName of teamNames) {
-            let { data: team } = await supabase
-                .from('teams')
-                .select('team_id')
-                .eq('team_name', tName)
-                .maybeSingle();
-
-            if (!team) {
-                const { data: newTeam, error: nErr } = await supabase
-                    .from('teams')
-                    .insert({ team_name: tName, created_by: user.id })
-                    .select('team_id')
-                    .single();
-                if (nErr) throw nErr;
-                team = newTeam;
-            }
-            teamsMap.set(tName, team.team_id);
-        }
-
-        // 3. Create Match
-        const homeTeamName = parsedRoster.find(p => p.isHome)?.teamName || teamNames[0];
-        const awayTeamName = teamNames.find(t => t !== homeTeamName) || teamNames[1] || homeTeamName;
-
-        const { data: match, error: mErr } = await supabase
-            .from('matches')
-            .insert({
-                match_name: name,
-                tournament_name: tournament,
-                match_date: date,
-                home_team_id: teamsMap.get(homeTeamName),
-                away_team_id: teamsMap.get(awayTeamName),
-                is_futsal: isFutsal,
-                video_url: videoType === 'youtube' ? ytUrl : null,
-                status: 'Doing',
-                created_by: user.id,
-            })
-            .select('match_id')
-            .single();
-
-        
-        if (mErr) throw mErr;
-
-        // 4. Insert Players & Lineups
-        for (const p of parsedRoster) {
-            // Look up by name + team to avoid cross-team collisions and to reuse
-            // existing player IDs across multiple matches for the same team.
-            let { data: player } = await supabase
-                .from('players')
-                .select('player_id')
-                .eq('player_name', p.playerName)
-                .eq('team_id', teamsMap.get(p.teamName))
-                .maybeSingle();
-
-            if (!player) {
-                const { data: newPlayer, error: npErr } = await supabase
-                    .from('players')
-                    .insert({
-                        player_name: p.playerName,
-                        team_id: teamsMap.get(p.teamName),
-                        position: p.position,
-                        created_by: user.id
-                    })
-                    .select('player_id')
-                    .single();
-                if (npErr) throw npErr;
-                player = newPlayer;
-            }
-
-            const { error: lErr } = await supabase
-                .from('lineups')
-                .insert({
-                    match_id: match.match_id,
-                    team_id: teamsMap.get(p.teamName),
-                    player_id: player.player_id,
-                    jersey_no: p.jerseyNo,
-                    position: p.position,
-                    starting_xi: p.startingXI,
-                    substitution_in_time: p.subTimeIn,
-                    substitution_off_time: p.subTimeOff,
-                    match_duration: p.duration
-                });
-            if (lErr) throw lErr;
-        }
+        await ensurePlaceholders(matchId, mode);
 
         status.innerText = 'Match initialized successfully! Redirecting...';
         status.style.color = 'var(--success)';
@@ -403,7 +499,8 @@ async function handleCreateMatch() {
         setTimeout(() => {
             // Reset state upon successful creation to avoid ghost values on next match
             parsedRoster = null;
-            matchState = { tournament: '', name: '', date: '', videoType: 'youtube', ytUrl: '', isFutsal: 'true' };
+            focusPlayer = null;
+            matchState = { tournament: '', name: '', date: '', videoType: 'youtube', ytUrl: '', isFutsal: 'true', mode: 'full' };
             window.location.hash = '#matches';
         }, 1500);
 
@@ -414,4 +511,79 @@ async function handleCreateMatch() {
         btn.innerText = 'Initialize Match Session';
         btn.disabled = false;
     }
+}
+
+// Full and one-team modes: teams + lineups come from the uploaded roster.
+async function createRosterMatch(baseMatch, mode) {
+    const teamsMap = new Map(); // teamName -> teamId
+    const teamNames = [...new Set(parsedRoster.map(p => p.teamName))];
+    for (const tName of teamNames) teamsMap.set(tName, await getOrCreateTeam(tName));
+
+    let homeTeamName = parsedRoster.find(p => p.isHome)?.teamName || teamNames[0];
+    let awayTeamName = teamNames.find(t => t !== homeTeamName) || teamNames[1] || homeTeamName;
+    let homeId = teamsMap.get(homeTeamName), awayId = teamsMap.get(awayTeamName);
+
+    const extra = {};
+    if (mode === 'team') {
+        const focusName = document.getElementById('focus-team-select').value;
+        const focusId = teamsMap.get(focusName);
+        extra.focus_team_id = focusId;
+        if (teamNames.length < 2) {
+            // Roster only has our team: the opponent comes from the name field.
+            const oppId = await getOrCreateTeam(document.getElementById('team-opponent-name').value);
+            const focusIsHome = parsedRoster.some(p => p.teamName === focusName && p.isHome);
+            homeId = focusIsHome ? focusId : oppId;
+            awayId = focusIsHome ? oppId : focusId;
+        }
+    }
+
+    const matchId = await createMatchRecord({ ...baseMatch, home_team_id: homeId, away_team_id: awayId, ...extra });
+
+    // Insert Players & Lineups. Look up by name + team to avoid cross-team
+    // collisions and to reuse existing player IDs across matches for the same team.
+    for (const p of parsedRoster) {
+        const teamId = teamsMap.get(p.teamName);
+        const playerId = await getOrCreatePlayer({ playerName: p.playerName, teamId, position: p.position });
+        await addLineupRow({
+            match_id: matchId,
+            team_id: teamId,
+            player_id: playerId,
+            jersey_no: p.jerseyNo,
+            position: p.position,
+            starting_xi: p.startingXI,
+            substitution_in_time: p.subTimeIn,
+            substitution_off_time: p.subTimeOff,
+            match_duration: p.duration
+        });
+    }
+    return matchId;
+}
+
+// One-player mode: the lineup is just the focus player (stand-ins are added after).
+async function createPlayerModeMatch(baseMatch) {
+    const teamId = await getOrCreateTeam(document.getElementById('pm-team-name').value);
+    const oppName = document.getElementById('pm-opponent-name').value.trim();
+    const oppId = oppName ? await getOrCreateTeam(oppName) : null;
+    const isHome = document.getElementById('pm-is-home').value === 'true';
+
+    let playerId, position;
+    if (focusPlayer) {
+        playerId = focusPlayer.player_id;
+        position = focusPlayer.position || null;
+    } else {
+        position = document.getElementById('pm-new-position').value || null;
+        playerId = await getOrCreatePlayer({ playerName: document.getElementById('pm-new-name').value.trim(), teamId, position });
+    }
+
+    // With no opponent name both sides start as our team; ensurePlaceholders()
+    // then creates "Opponent – <date>" and links it to the other side.
+    const matchId = await createMatchRecord({
+        ...baseMatch,
+        home_team_id: isHome ? teamId : (oppId || teamId),
+        away_team_id: isHome ? (oppId || teamId) : teamId,
+        focus_team_id: teamId,
+        focus_player_id: playerId,
+    });
+    await addLineupRow({ match_id: matchId, team_id: teamId, player_id: playerId, jersey_no: document.getElementById('pm-jersey').value.trim() || null, position, starting_xi: true });
+    return matchId;
 }

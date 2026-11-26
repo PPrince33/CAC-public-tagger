@@ -5,6 +5,7 @@ import { supabase } from '../supabase'
 // rewrites processed_match_events for that match.
 
 const PERIOD_OFFSETS_DEFAULT = { '1st Half': 0, '2nd Half': 45, '1st Extra Time': 90, '2nd Extra Time': 105 }
+const PERIOD_OFFSETS_FUTSAL = { '1st Half': 0, '2nd Half': 20, '1st Extra Time': 40, '2nd Extra Time': 45 }
 
 async function fetchAllRawEvents(matchId) {
     let all = [], from = 0
@@ -43,7 +44,6 @@ async function teamByPlayer(matchId, match) {
  */
 export async function finalizeMatch(matchId, opts = {}) {
     if (!matchId) throw new Error('No match selected.')
-    const offsets = { ...PERIOD_OFFSETS_DEFAULT, ...(opts.offsets || {}) }
     const warnings = []
 
     const { data: match, error: me } = await supabase.from('matches')
@@ -54,6 +54,8 @@ export async function finalizeMatch(matchId, opts = {}) {
     if (!raw.length) throw new Error('No events to process.')
     const isFutsal = raw[0].is_futsal != null ? raw[0].is_futsal === true : match.is_futsal === true
     const pLen = isFutsal ? 40 : 120, pWid = isFutsal ? 20 : 80
+    // QC passes the real offsets; the tagger and backfill use the format's standard halves
+    const offsets = { ...(isFutsal ? PERIOD_OFFSETS_FUTSAL : PERIOD_OFFSETS_DEFAULT), ...(opts.offsets || {}) }
 
     const isMT = (r, type) => r.action === 'Match Time' && r.type === type
 

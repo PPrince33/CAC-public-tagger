@@ -6,10 +6,50 @@ import { ensurePlaceholders } from './placeholders'
 
 export const FREE_AGENT_TEAM = 'Free agent'
 
-/** Base URL of the CAC-Match-Report app, for report links. */
+/** Base URL of the CAC-Match-Report app (report pages + AI summary API). */
+export const REPORT_BASE = (import.meta.env.VITE_REPORT_BASE_URL || 'https://calcioac.com/match-reports').replace(/\/$/, '')
+
+/** Public, read-only client link for a project (summary shows once approved). */
 export function reportUrl(project) {
-    const base = (import.meta.env.VITE_REPORT_BASE_URL || 'https://calcioac.com/match-reports').replace(/\/$/, '')
-    return `${base}/player/${project.player_id}?project=${project.project_id}`
+    return `${REPORT_BASE}/player/share/${project.share_token}`
+}
+
+/** Ask the report app to draft a scout summary from this project's processed stats. */
+export async function generateSummary(project) {
+    const res = await fetch(`${REPORT_BASE}/api/analyze`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind: 'player', playerId: project.player_id, matchIds: project.matches.map(m => m.match_id) }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok || !data.analysis) throw new Error(data.error || `Report app answered ${res.status}`)
+    return data.analysis.trim()
+}
+
+export async function saveSummary(projectId, text, approved) {
+    const { error } = await supabase.from('player_projects')
+        .update({ scout_summary: text, summary_approved: approved, summary_updated_at: new Date().toISOString() })
+        .eq('project_id', projectId)
+    if (error) throw error
+}
+
+/** Optional player details (player_profiles); every field may be empty. */
+export async function loadProfile(playerId) {
+    const { data } = await supabase.from('player_profiles').select('*').eq('player_id', playerId).maybeSingle()
+    return data || null
+}
+
+export async function saveProfile(playerId, f) {
+    const row = {
+        player_id: playerId,
+        date_of_birth: f.date_of_birth || null,
+        preferred_foot: f.preferred_foot || null,
+        height_cm: f.height_cm === '' || f.height_cm == null ? null : Number(f.height_cm),
+        weight_kg: f.weight_kg === '' || f.weight_kg == null ? null : Number(f.weight_kg),
+        nationality: (f.nationality || '').trim() || null,
+        updated_at: new Date().toISOString(),
+    }
+    const { error } = await supabase.from('player_profiles').upsert(row)
+    if (error) throw error
 }
 
 /** Has this match got rows in processed_match_events? */
@@ -37,7 +77,7 @@ export async function projectMatches(projectId) {
 /** All projects the user can see, with match counts. */
 export async function listProjects() {
     const { data, error } = await supabase.from('player_projects')
-        .select('project_id, player_id, title, client_type, status, share_token, created_at, players(player_name, position, teams(team_name))')
+        .select('project_id, player_id, title, client_type, status, share_token, scout_summary, summary_approved, created_at, players(player_name, position, teams(team_name))')
         .order('created_at', { ascending: false })
     if (error) throw error
     return Promise.all((data || []).map(async p => {

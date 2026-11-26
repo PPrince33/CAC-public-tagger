@@ -1,5 +1,5 @@
 import { supabase } from '../supabase'
-import { listProjects, createProject, existingProcessedMatchesFor, refreshProjectStatus, reportUrl, FREE_AGENT_TEAM } from '../lib/playerProjects'
+import { listProjects, createProject, existingProcessedMatchesFor, refreshProjectStatus, reportUrl, generateSummary, saveSummary, loadProfile, saveProfile, FREE_AGENT_TEAM } from '../lib/playerProjects'
 
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 
@@ -118,9 +118,13 @@ async function renderList() {
                         <span style="font-family: var(--font-mono); font-size: 0.8rem;">${done}/${total} processed</span>
                         <span style="background: ${STATUS_COLOR[p.status] || 'var(--border)'}; color: #fff; padding: 3px 10px; border-radius: 99px; font-size: 0.65rem; font-weight: 700; text-transform: uppercase;">${esc(p.status)}</span>
                         ${next ? `<a href="#tagger?id=${next.match_id}&project=${p.project_id}" class="btn btn-primary" style="width: auto; padding: 6px 14px; font-size: 0.8rem;">Tag next match</a>` : ''}
-                        ${allDone ? `<button class="btn btn-ghost pp-copy" data-url="${esc(reportUrl(p))}" style="width: auto; padding: 6px 14px; font-size: 0.8rem; border: 1px solid var(--border);">Report link</button>` : ''}
+                        ${done > 0 ? `<a href="${esc(reportUrl(p))}" target="_blank" rel="noopener" class="btn btn-ghost" style="width: auto; padding: 6px 14px; font-size: 0.8rem; border: 1px solid var(--border);">Open report</a>
+                        <button class="btn btn-ghost pp-copy" data-url="${esc(reportUrl(p))}" style="width: auto; padding: 6px 14px; font-size: 0.8rem; border: 1px solid var(--border);">Copy share link</button>
+                        <button class="btn btn-ghost pp-edit" data-id="${p.project_id}" style="width: auto; padding: 6px 14px; font-size: 0.8rem; border: 1px solid var(--border);">Summary &amp; details</button>` : ''}
                     </div>
                 </div>
+                ${!allDone && done > 0 ? `<div style="margin-top: 8px; font-size: 0.75rem; color: var(--text-muted);">The report already works with the ${done} processed match${done > 1 ? 'es' : ''}; the rest join it once processed.</div>` : ''}
+                <div class="pp-editor" data-id="${p.project_id}" style="display: none; margin-top: 16px; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--primary-light);"></div>
                 <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem;">
                     ${p.matches.map(m => `
                         <div style="display: flex; gap: 10px; align-items: center;">
@@ -135,8 +139,14 @@ async function renderList() {
 
         list.querySelectorAll('.pp-copy').forEach(b => b.onclick = async () => {
             try { await navigator.clipboard.writeText(b.dataset.url); b.innerText = 'Copied!'; }
-            catch { prompt('Copy the report link:', b.dataset.url); }
-            setTimeout(() => { b.innerText = 'Report link'; }, 1500);
+            catch { prompt('Copy the share link:', b.dataset.url); }
+            setTimeout(() => { b.innerText = 'Copy share link'; }, 1500);
+        });
+        list.querySelectorAll('.pp-edit').forEach(b => b.onclick = () => {
+            const box = list.querySelector(`.pp-editor[data-id="${b.dataset.id}"]`);
+            if (box.style.display === 'block') { box.style.display = 'none'; return; }
+            box.style.display = 'block';
+            openEditor(box, projects.find(p => p.project_id === b.dataset.id));
         });
 
         // Keep server-side status in sync (e.g. matches processed from QC)
@@ -147,6 +157,64 @@ async function renderList() {
     } catch (err) {
         list.innerHTML = `<div class="card" style="color: var(--danger);">Could not load projects: ${esc(err.message)}<br><span style="color: var(--text-muted); font-size: 0.8rem;">Has supabase/player_projects.sql been run?</span></div>`;
     }
+}
+
+/* ── Scout summary + optional player details ─────── */
+async function openEditor(box, project) {
+    const inp = 'class="form-input" style="margin: 0;"';
+    box.innerHTML = `
+        <h4 style="margin: 0 0 8px;">Scout summary</h4>
+        <textarea class="form-input ppe-text" rows="6" style="width: 100%; margin: 0; font-family: inherit; line-height: 1.5;" placeholder="Generate a draft from the stats, or write the summary yourself.">${esc(project.scout_summary || '')}</textarea>
+        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px;">
+            <button class="btn btn-ghost ppe-gen" style="width: auto; padding: 6px 14px; font-size: 0.8rem; border: 1px solid var(--border);">Generate draft</button>
+            <button class="btn btn-primary ppe-save" style="width: auto; padding: 6px 14px; font-size: 0.8rem;">Save</button>
+            <label style="display: flex; gap: 6px; align-items: center; font-size: 0.8rem; font-weight: 600;">
+                <input type="checkbox" class="ppe-approved" ${project.summary_approved ? 'checked' : ''}> Approved (clients see it on the share link)
+            </label>
+            <span class="ppe-msg" style="font-size: 0.8rem; color: var(--text-muted);"></span>
+        </div>
+        <h4 style="margin: 20px 0 4px;">Player details <span style="font-weight: 400; font-size: 0.75rem; color: var(--text-muted);">(optional: fill in whatever you know, any time)</span></h4>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; align-items: end;">
+            <label class="form-label" style="margin: 0;">Date of birth<input type="date" ${inp} data-f="date_of_birth"></label>
+            <label class="form-label" style="margin: 0;">Foot<select ${inp} data-f="preferred_foot"><option value="">—</option><option>Left</option><option>Right</option><option>Both</option></select></label>
+            <label class="form-label" style="margin: 0;">Height (cm)<input type="number" min="100" max="230" ${inp} data-f="height_cm"></label>
+            <label class="form-label" style="margin: 0;">Weight (kg)<input type="number" min="30" max="150" ${inp} data-f="weight_kg"></label>
+            <label class="form-label" style="margin: 0;">Nationality<input type="text" ${inp} data-f="nationality"></label>
+            <button class="btn btn-primary ppe-psave" style="width: auto; padding: 8px 14px; font-size: 0.8rem;">Save details</button>
+        </div>
+        <span class="ppe-pmsg" style="font-size: 0.8rem; color: var(--text-muted);"></span>`;
+
+    const q = (c) => box.querySelector(c);
+    const msg = (t, err) => { q('.ppe-msg').innerText = t; q('.ppe-msg').style.color = err ? 'var(--danger)' : 'var(--text-muted)'; };
+    const text = q('.ppe-text'), approved = q('.ppe-approved');
+
+    const save = async () => {
+        if (approved.checked && !text.value.trim()) { approved.checked = false; return msg('Write or generate a summary before approving.', true); }
+        try {
+            await saveSummary(project.project_id, text.value, approved.checked);
+            project.scout_summary = text.value; project.summary_approved = approved.checked;
+            msg(approved.checked ? 'Saved and approved: visible on the share link.' : 'Saved as draft: hidden from the share link.');
+        } catch (e) { msg('Save failed: ' + e.message, true); }
+    };
+    q('.ppe-save').onclick = save;
+    approved.onchange = save;
+    q('.ppe-gen').onclick = async (e) => {
+        const b = e.currentTarget; b.disabled = true; b.innerText = 'Generating...'; msg('');
+        try {
+            text.value = await generateSummary(project);
+            approved.checked = false;
+            msg('Draft ready. Edit it, then Save (and tick Approved when happy).');
+        } catch (err) { msg('Could not generate: ' + err.message, true); }
+        b.disabled = false; b.innerText = 'Generate draft';
+    };
+
+    const profile = await loadProfile(project.player_id);
+    box.querySelectorAll('[data-f]').forEach(el => { el.value = profile?.[el.dataset.f] ?? ''; });
+    q('.ppe-psave').onclick = async () => {
+        const f = {}; box.querySelectorAll('[data-f]').forEach(el => { f[el.dataset.f] = el.value; });
+        try { await saveProfile(project.player_id, f); q('.ppe-pmsg').innerText = 'Details saved.'; }
+        catch (e) { q('.ppe-pmsg').innerText = 'Save failed: ' + e.message; }
+    };
 }
 
 /* ── New project form ───────────────────────────── */

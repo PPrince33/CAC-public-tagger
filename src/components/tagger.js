@@ -7,6 +7,7 @@ import { VideoEngine } from '../lib/videoEngine'
 import { PlayerTracker } from '../lib/playerTracker'
 import { finalizeMatch } from '../lib/finalizeMatch'
 import { ensurePlaceholders } from '../lib/placeholders'
+import { projectsForMatch, projectMatches, refreshProjectStatus } from '../lib/playerProjects'
 
 export function TaggerView() {
     return `
@@ -1457,8 +1458,9 @@ export async function initTagger() {
                 if (localEvents.length > 0) throw new Error('Some events could not be synced. Fix the sync first, then process again.');
             }
             const res = await finalizeMatch(activeMatch.match_id, { computeScore: false, markDone: false });
-            alert(`Processed ${res.count} events.` + (res.warnings.length ? '\n\n' + res.warnings.join('\n') : ''));
+            const msg = `Processed ${res.count} events.` + (res.warnings.length ? '\n\n' + res.warnings.join('\n') : '');
             btn.innerText = 'Re-process';
+            await afterProcessProject(msg);
         } catch (err) {
             alert('Processing error: ' + err.message);
             btn.innerText = label;
@@ -1579,6 +1581,28 @@ function toggleShortcutsModal() {
 // ──────────────────────────────────────────
 // PLAYER GRIDS
 // ──────────────────────────────────────────
+// ──────────────────────────────────────────
+// PLAYER PROJECTS: status + "Next match in project"
+// ──────────────────────────────────────────
+async function afterProcessProject(msg) {
+    let projectIds = [];
+    try { projectIds = await projectsForMatch(activeMatch.match_id); } catch { /* table not created yet */ }
+    if (!projectIds.length) { alert(msg); return; }
+
+    // Prefer the project the analyst came from (?project=...)
+    const fromUrl = new URLSearchParams(window.location.hash.split('?')[1] || '').get('project');
+    const pid = projectIds.includes(fromUrl) ? fromUrl : (projectIds.includes(activeMatch.player_project_id) ? activeMatch.player_project_id : projectIds[0]);
+    try {
+        await Promise.all(projectIds.map(id => refreshProjectStatus(id)));
+        const next = (await projectMatches(pid)).find(m => !m.processed && m.match_id !== activeMatch.match_id);
+        if (!next) { alert(msg + '\n\nEvery match in this project is processed. The project is ready for its report.'); return; }
+        if (confirm(msg + `\n\nNext match in project: ${next.home_team?.team_name} vs ${next.away_team?.team_name} (${next.match_date || 'no date'}).\nOpen it now?`))
+            window.location.hash = `#tagger?id=${next.match_id}&project=${pid}`;
+    } catch (err) {
+        alert(msg + '\n\nCould not update the project: ' + err.message);
+    }
+}
+
 // ──────────────────────────────────────────
 // TAGGING MODES (full / team / player)
 // ──────────────────────────────────────────

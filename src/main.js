@@ -224,6 +224,9 @@ class App {
                             <a href="#matches" class="nav-item ${hash === '#matches' ? 'active' : ''}">
                                 <span>@</span> My Matches
                             </a>
+                            <a href="#player-projects" class="nav-item ${hash === '#player-projects' ? 'active' : ''}">
+                                <span>&gt;</span> Player Projects
+                            </a>
                             <a href="#qc" class="nav-item ${hash === '#qc' ? 'active' : ''}">
                                 <span>~</span> QC Portal
                             </a>

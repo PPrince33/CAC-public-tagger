@@ -30,6 +30,11 @@ export const router = {
             onRender: () => import('./components/createdMatches').then(m => m.initMatches?.()),
             requiresAuth: true
         },
+        '#player-projects': {
+            component: () => import('./components/playerProjects').then(m => m.PlayerProjectsView()),
+            onRender: () => import('./components/playerProjects').then(m => m.initPlayerProjects?.()),
+            requiresAuth: true
+        },
         '#tagger': {
             component: () => import('./components/tagger').then(m => m.TaggerView()),
             onRender: () => import('./components/tagger').then(m => m.initTagger?.()),

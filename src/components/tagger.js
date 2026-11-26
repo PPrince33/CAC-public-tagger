@@ -5,6 +5,7 @@ import { PitchCanvas } from '../lib/pitchCanvas'
 import { GoalFaceCanvas } from '../lib/goalFace'
 import { VideoEngine } from '../lib/videoEngine'
 import { PlayerTracker } from '../lib/playerTracker'
+import { finalizeMatch } from '../lib/finalizeMatch'
 
 export function TaggerView() {
     return `
@@ -30,6 +31,7 @@ export function TaggerView() {
                     <button class="btn btn-ghost" style="width: auto; padding: 6px 12px; border: 1px solid var(--border); font-size: 0.8125rem;" id="toggle-sidebar-btn">Toggle Sidebar</button>
                     <button class="btn btn-ghost" style="width: auto; padding: 6px 12px; font-size: 0.8125rem;" id="back-to-matches">Back</button>
                     <button class="btn btn-primary" style="width: auto; padding: 6px 16px; background: var(--success); font-size: 0.8125rem;" id="finish-match-btn">Finish Match</button>
+                    <button class="btn btn-primary" style="width: auto; padding: 6px 16px; font-size: 0.8125rem;" id="tagger-finish-btn" title="Sync events and write processed_match_events (no QC needed)">Finish &amp; Process</button>
                 </div>
             </header>
 
@@ -1429,6 +1431,27 @@ export async function initTagger() {
             alert("Match submitted to QC!");
             window.location.hash = '#matches';
         }
+    }, { signal });
+
+    // Finish & Process: sync pending events, then write processed_match_events.
+    // Leaves match status alone (QC stays optional) and does not touch the score.
+    document.getElementById('tagger-finish-btn')?.addEventListener('click', async (e) => {
+        if (!activeMatch) return;
+        const btn = e.currentTarget;
+        const label = btn.innerText;
+        btn.disabled = true; btn.innerText = 'Processing...';
+        try {
+            if (localEvents.length > 0) {
+                await syncEvents();
+                if (localEvents.length > 0) throw new Error('Some events could not be synced. Fix the sync first, then process again.');
+            }
+            const res = await finalizeMatch(activeMatch.match_id, { computeScore: false, markDone: false });
+            alert(`Processed ${res.count} events.` + (res.warnings.length ? '\n\n' + res.warnings.join('\n') : ''));
+            btn.innerText = 'Re-process';
+        } catch (err) {
+            alert('Processing error: ' + err.message);
+            btn.innerText = label;
+        } finally { btn.disabled = false; }
     }, { signal });
 
     // Create Player Modal

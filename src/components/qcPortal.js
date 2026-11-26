@@ -3,6 +3,7 @@ import { exportToExcel } from '../lib/excelExport'
 import { VideoEngine } from '../lib/videoEngine'
 import { PitchCanvas } from '../lib/pitchCanvas'
 import { CAC_LOGIC } from '../lib/cacLogic'
+import { finalizeMatch } from '../lib/finalizeMatch'
 
 /* ──────────────────────────────────────────
    MODULE STATE
@@ -1209,14 +1210,14 @@ function triggerProcessing() {
 
     const sorted = [...masterEventsData].sort((a, b) => timeToSeconds(a.Timestamp) - timeToSeconds(b.Timestamp));
     const endEv = sorted.slice().reverse().find(e => e.Action === 'Match Time' && e.Sub_Action_Outcome === 'Match End');
-    if (!endEv) return showPopup("Missing 'Match End' event. Ensure the tagger logged a Match Time -> [Period] -> Match End event.", 'Error');
-
-    const lp = endEv.Action_Outcome;
+    // A missing Match End is allowed (one-team / player-only tagging); finalizeMatch reports it as a warning.
+    const lp = endEv ? endEv.Action_Outcome : '2nd Half';
     const c2 = document.getElementById('qc-offset-2nd'), c1e = document.getElementById('qc-offset-1et'), c2e = document.getElementById('qc-offset-2et');
     const fd = document.getElementById('qc-format-display');
     c2.style.display = c1e.style.display = c2e.style.display = 'none';
 
-    if (lp === '1st Half') fd.innerText = 'Single Half';
+    if (!endEv) { fd.innerText = 'No Match End logged'; c2.style.display = 'block'; }
+    else if (lp === '1st Half') fd.innerText = 'Single Half';
     else if (lp === '2nd Half') { fd.innerText = 'Standard 2 Halves'; c2.style.display = 'block'; }
     else if (lp === '1st Extra Time') { fd.innerText = 'Ended in 1st ET'; c2.style.display = c1e.style.display = 'block'; }
     else { fd.innerText = `Full ET (${lp})`; c2.style.display = c1e.style.display = c2e.style.display = 'block'; }
@@ -1235,95 +1236,20 @@ async function executeProcessing() {
     const orig = btn.innerText;
     btn.innerText = 'Processing...'; btn.disabled = true; btn.style.opacity = '0.6';
 
-    let df = JSON.parse(JSON.stringify(masterEventsData));
     try {
-        df.sort((a, b) => timeToSeconds(a.Timestamp) - timeToSeconds(b.Timestamp));
-        let curHalf = null, koTimes = {};
-        const offsets = { '1st Half': 0, '2nd Half': o2, '1st Extra Time': o1e, '2nd Extra Time': o2e };
-        const pLen = isMatchFutsal ? 40 : 120, pWid = isMatchFutsal ? 20 : 80;
-
-        // Pass 1: Halves
-        df.forEach(r => {
-            if (r.Action === 'Match Time' && r.Sub_Action_Outcome === 'Kick-Off') { curHalf = r.Action_Outcome; if (!koTimes[curHalf]) koTimes[curHalf] = timeToSeconds(r.Timestamp); }
-            else if (r.Action === 'Match Time' && r.Action_Outcome === 'Penalty shootout') curHalf = 'Penalty shootout';
-            r.Half = curHalf;
-            if (r.Action === 'Match Time' && (r.Sub_Action_Outcome === 'Half Break' || r.Sub_Action_Outcome === 'Match End')) curHalf = null;
+        const res = await finalizeMatch(activeMatchId, {
+            offsets: { '2nd Half': o2, '1st Extra Time': o1e, '2nd Extra Time': o2e },
+            computeScore: true, markDone: true
         });
-
-        // Pass 2: Build payloads
-        const payloads = df.map(r => {
-            let min = null;
-            if (r.Half && r.Half !== 'Penalty shootout' && koTimes[r.Half] != null) {
-                min = Math.round((timeToSeconds(r.Timestamp) - koTimes[r.Half]) / 60) + offsets[r.Half];
-            }
-            let sx = r.Start_X != null ? parseFloat(r.Start_X) : null, sy = r.Start_Y != null ? parseFloat(r.Start_Y) : null;
-            let ex = r.End_X != null ? parseFloat(r.End_X) : null, ey = r.End_Y != null ? parseFloat(r.End_Y) : null;
-            let ez = r.End_Z != null ? parseFloat(r.End_Z) : null;
-            let gkx = r.GK_X != null ? parseFloat(r.GK_X) : null, gky = r.GK_Y != null ? parseFloat(r.GK_Y) : null;
-            if (r.Team_Direction === 'R2L' && r.Half !== 'Penalty shootout') {
-                if (sx != null) sx = pLen - sx; if (ex != null) ex = pLen - ex;
-                if (sy != null) sy = pWid - sy; if (ey != null) ey = pWid - ey;
-                if (gkx != null) gkx = pLen - gkx; if (gky != null) gky = pWid - gky;
-            }
-            return {
-                match_event_id: r.Match_Event_ID, match_id: activeMatchId,
-                half: r.Half || null, match_minute: min, match_time_seconds: timeToSeconds(r.Timestamp),
-                start_x: sx, start_y: sy, end_x: ex, end_y: ey, end_z: ez,
-                gk_x: gkx, gk_y: gky,
-                team_direction: 'L2R',
-                original_team_direction: r.Team_Direction || 'L2R',
-                action: r.Action || 'Unknown', outcome: r.Action_Outcome || 'Unknown',
-                type: r.Sub_Action_Outcome || null, body_part: r.Body_Part || null,
-                player_id: r.Player_ID, reaction_player_id: r.Reaction_Player_ID || null,
-                is_futsal: isMatchFutsal, pressure_on: r.Pressure_On === 'Yes',
-                shot_technique: r.Shot_Technique || null,
-                first_time_shot: r.First_Time_Shot != null ? parseInt(r.First_Time_Shot) : null,
-                assist_type: r.Assist_Type || null
-            };
-        });
-
-        await supabase.from('processed_match_events').delete().eq('match_id', activeMatchId);
-        for (let i = 0; i < payloads.length; i += 1000) {
-            const { error } = await supabase.from('processed_match_events').insert(payloads.slice(i, i + 1000));
-            if (error) throw error;
-        }
-
-        // ── Compute final score (open play only — penalty shootout excluded) ──
-        const homeId = activeMatch?.home_team_id;
-        const awayId = activeMatch?.away_team_id;
-        let homeScore = 0, awayScore = 0;
-        df.forEach(r => {
-            if (r.Half === 'Penalty shootout') return;
-            const outcome = r.Action_Outcome || '';
-            const sub = r.Sub_Action_Outcome || '';
-            const isOwnGoal = outcome === 'Own Goal' || sub === 'Own Goal';
-            const isGoal = outcome === 'Goal';
-            if (!isGoal && !isOwnGoal) return;
-            const shooter = matchPlayers.find(p => p.player_id === r.Player_ID);
-            if (!shooter) return;
-            // Normal goal → shooter's team scores; Own goal → opposite team scores
-            const creditTeamId = isOwnGoal
-                ? (shooter.team_id === homeId ? awayId : homeId)
-                : shooter.team_id;
-            if (creditTeamId === homeId) homeScore++;
-            else if (creditTeamId === awayId) awayScore++;
-        });
-
-        const { error: ue } = await supabase.from('matches').update({
-            status: 'Done',
-            home_team_score: homeScore,
-            away_team_score: awayScore
-        }).eq('match_id', activeMatchId);
-        if (ue) throw ue;
-        activeMatch.home_team_score = homeScore;
-        activeMatch.away_team_score = awayScore;
-
+        activeMatch.home_team_score = res.homeScore;
+        activeMatch.away_team_score = res.awayScore;
         activeMatch.status = 'Done';
         document.getElementById('qc-export-btn').disabled = false;
         btn.innerText = 'Re-process';
         btn.disabled = false;
         btn.style.opacity = '1';
-        showPopup(`Processing complete. Final score: ${homeScore} — ${awayScore}. Re-run anytime to push corrections.`, 'Success');
+        showPopup(`Processing complete. Final score: ${res.homeScore} — ${res.awayScore}. Re-run anytime to push corrections.` +
+            (res.warnings.length ? '\n\n' + res.warnings.join('\n') : ''), 'Success');
     } catch (err) {
         btn.innerText = orig; btn.disabled = false; btn.style.opacity = '1';
         showPopup('Processing error: ' + err.message, 'Error');

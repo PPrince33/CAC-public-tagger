@@ -1,6 +1,7 @@
 import { supabase } from '../supabase'
 import { exportToExcel, exportToCSV } from '../lib/excelExport'
 import { CAC_LOGIC } from '../lib/cacLogic'
+import { backfillUnprocessed } from '../lib/finalizeMatch'
 
 /* ──────────────────────────────────────────
    MODULE STATE
@@ -86,7 +87,10 @@ export function AdminPortalView() {
             <div class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
                     <h3 style="margin: 0;">All Matches</h3>
-                    <input id="admin-match-search" class="form-input admin-search" style="width: 280px; margin: 0;" type="text" placeholder="Search matches...">
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <button class="dl-btn" id="admin-backfill-btn" title="Process every match that has tagged events but no processed_match_events">Process unprocessed matches</button>
+                        <input id="admin-match-search" class="form-input admin-search" style="width: 280px; margin: 0;" type="text" placeholder="Search matches...">
+                    </div>
                 </div>
 
                 <!-- Bulk Operations Bar -->
@@ -290,6 +294,25 @@ export async function initAdminPortal() {
             tab.classList.add('active');
             document.getElementById(`admin-tab-${tab.dataset.tab}`).classList.add('visible');
         });
+    });
+
+    // Backfill: process every match that was tagged but never processed
+    document.getElementById('admin-backfill-btn')?.addEventListener('click', async (e) => {
+        const btn = e.currentTarget;
+        if (!confirm('Process every match that has tagged events but no processed data yet? Matches already processed are skipped; scores and status are not changed.')) return;
+        btn.disabled = true;
+        try {
+            const r = await backfillUnprocessed(p => { btn.innerText = `Processing... ${p.done + p.failed} done`; });
+            console.table(r.done.map(m => ({ match: m.match_name, events: m.count, warnings: m.warnings.join(' | ') })));
+            if (r.failed.length) console.warn('Backfill failures', r.failed);
+            const failed = r.failed.filter(f => f.error !== 'No events to process.');
+            const empty = r.failed.length - failed.length;
+            alert(`Processed ${r.done.length} match(es). Already processed: ${r.skipped.length}. No events: ${empty}.` +
+                (failed.length ? `\n\nFailed (${failed.length}):\n` + failed.map(f => `${f.match_name}: ${f.error}`).join('\n') : '') +
+                '\n\nDetails in the browser console.');
+        } catch (err) {
+            alert('Backfill error: ' + err.message);
+        } finally { btn.disabled = false; btn.innerText = 'Process unprocessed matches'; }
     });
 
     // Load all sections in parallel

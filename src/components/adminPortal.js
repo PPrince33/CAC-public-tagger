@@ -2,6 +2,7 @@ import { supabase } from '../supabase'
 import { exportToExcel, exportToCSV } from '../lib/excelExport'
 import { CAC_LOGIC } from '../lib/cacLogic'
 import { backfillUnprocessed } from '../lib/finalizeMatch'
+import { CLEANUP_TABS, CLEANUP_SECTIONS, initCleanupTabs } from './adminCleanup'
 
 /* ──────────────────────────────────────────
    MODULE STATE
@@ -80,6 +81,7 @@ export function AdminPortalView() {
             <button class="admin-tab" data-tab="teams">Merge Teams</button>
             <button class="admin-tab" data-tab="players">Merge Players</button>
             <button class="admin-tab" data-tab="actionflow">Action Flow</button>
+            ${CLEANUP_TABS}
         </div>
 
         <!-- MATCHES TAB -->
@@ -227,6 +229,8 @@ export function AdminPortalView() {
             </div>
         </section>
 
+        ${CLEANUP_SECTIONS}
+
         <!-- ACTION FLOW TAB -->
         <section id="admin-tab-actionflow" class="admin-section">
             <div class="card">
@@ -314,6 +318,8 @@ export async function initAdminPortal() {
             alert('Backfill error: ' + err.message);
         } finally { btn.disabled = false; btn.innerText = 'Process unprocessed matches'; }
     });
+
+    initCleanupTabs();
 
     // Load all sections in parallel
     await Promise.all([

@@ -939,7 +939,7 @@ function renderLogTable() {
 
         const cols = [
             { k: 'Analyst_Username', v: ev.Analyst_Username, e: false },
-            { k: 'Timestamp', v: ev.Timestamp, e: false },
+            { k: 'Timestamp', v: ev.Timestamp, e: 'time' },
             { k: 'Player_Team', v: pTeam, e: false },
             { k: 'Player_Jersey', v: pInfo, e: 'p1' },
             { k: 'Reaction_Player_Team', v: rTeam, e: false },
@@ -966,8 +966,36 @@ function renderLogTable() {
 
             if (c.k === 'Timestamp' && c.v) {
                 td.className = 'qc-ts-link';
-                td.title = 'Seek video to 5s before';
-                td.onclick = e => { e.stopPropagation(); seekVideoTo(c.v); };
+                td.title = 'Click: seek video to 5s before · Double-click: edit time (m:ss or h:mm:ss)';
+                td.onclick = e => { e.stopPropagation(); if (td.contentEditable !== 'true') seekVideoTo(c.v); };
+            }
+
+            if (c.e === 'time') {
+                // Video time of the event, e.g. to put a Half Break before the next Kick-Off
+                td.classList.add('editable');
+                td.ondblclick = e => {
+                    e.stopPropagation(); td.contentEditable = 'true'; td.focus();
+                    // Select the old time so typing replaces it
+                    const range = document.createRange(); range.selectNodeContents(td);
+                    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+                };
+                td.onkeydown = e => { if (e.key === 'Escape') { td.innerText = ev.Timestamp; td.blur(); } };
+                td.onkeypress = e => { if (e.key === 'Enter') { e.preventDefault(); td.blur(); } };
+                td.onblur = () => {
+                    td.contentEditable = 'false';
+                    const raw = td.innerText.trim();
+                    const ok = /^(\d+:)?\d{1,2}:\d{1,2}$/.test(raw) || /^\d+$/.test(raw);
+                    if (!ok) { td.innerText = ev.Timestamp; if (raw) showPopup('Use m:ss or h:mm:ss, e.g. 6:17 or 1:02:05.', 'Invalid time'); return; }
+                    const secs = Math.max(0, Math.round(timeToSeconds(raw)));
+                    if (secs > 3 * 3600) { td.innerText = ev.Timestamp; showPopup(`${raw} is over 3 hours into the video. Use m:ss, e.g. 6:17.`, 'Invalid time'); return; }
+                    const idx = masterEventsData.findIndex(x => x.Match_Event_ID === ev.Match_Event_ID);
+                    if (idx === -1 || masterEventsData[idx].Match_Time_Seconds === secs) { td.innerText = ev.Timestamp; return; }
+                    masterEventsData[idx].Match_Time_Seconds = secs;
+                    masterEventsData[idx].Timestamp = formatTime(secs);
+                    td.innerText = formatTime(secs);
+                    dirtyRows.add(ev.Match_Event_ID);
+                    tr.style.borderLeft = '3px solid var(--warning)';
+                };
             }
 
             if (c.e === true) {
@@ -1180,11 +1208,16 @@ async function saveLocalEdits() {
             start_x: e.Start_X, start_y: e.Start_Y, end_x: e.End_X, end_y: e.End_Y, end_z: e.End_Z,
             gk_x: e.GK_X, gk_y: e.GK_Y,
             player_id: e.Player_ID, reaction_player_id: e.Reaction_Player_ID, notes: e.Notes,
-            team_direction: e.Team_Direction
+            team_direction: e.Team_Direction,
+            match_time_seconds: e.Match_Time_Seconds
         }).eq('match_event_id', e.Match_Event_ID);
     });
     try {
-        await Promise.all(promises);
+        const results = await Promise.all(promises);
+        const failed = results.find(r => r && r.error);
+        if (failed) throw failed.error;
+        // Edited times may change the order (e.g. Half Break moved before a Kick-Off)
+        masterEventsData.sort((a, b) => (a.Match_Time_Seconds ?? 0) - (b.Match_Time_Seconds ?? 0));
         dirtyRows.clear(); renderLogTable();
         showPopup('Changes saved successfully.', 'Success');
     } catch (err) { showPopup('Save failed: ' + err.message, 'Error'); }

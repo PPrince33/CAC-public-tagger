@@ -8,7 +8,7 @@ export const FREE_AGENT_TEAM = 'Free agent'
 
 /** Base URL of the CAC-Match-Report app, for report links. */
 export function reportUrl(project) {
-    const base = (import.meta.env.VITE_REPORT_BASE_URL || '').replace(/\/$/, '')
+    const base = (import.meta.env.VITE_REPORT_BASE_URL || 'https://calcioac.com/match-reports').replace(/\/$/, '')
     return `${base}/player/${project.player_id}?project=${project.project_id}`
 }
 
